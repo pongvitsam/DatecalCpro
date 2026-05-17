@@ -59,6 +59,11 @@ body {
     box-shadow: 0 6px 20px rgba(225, 29, 72, 0.4);
 }
 
+.flatpickr-current-month .numInput.cur-year {
+    width: 4.25rem;
+    min-width: 4.25rem;
+}
+
 .flatpickr-calendar {
     background: rgba(255, 255, 255, 0.9) !important;
     backdrop-filter: blur(16px) !important;

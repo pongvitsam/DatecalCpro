@@ -111,9 +111,14 @@ test('A6 startOfDay strips time', function () {
     return assert(sod.getHours() === 0 && sod.getMinutes() === 0 && sod.getSeconds() === 0);
 });
 
-test('A7 ISO string parses to local midnight day', function () {
+test('A7 ISO string parses to local calendar day (not UTC drift)', function () {
     var sod = startOfDay('2026-05-17');
     return assert(sod.getFullYear() === 2026 && sod.getMonth() === 4 && sod.getDate() === 17);
+});
+
+test('A7b ISO string avoids UTC off-by-one in negative offset zones', function () {
+    var sod = startOfDay('2026-01-01');
+    return assert(sod.getMonth() === 0 && sod.getDate() === 1, 'got ' + sod.toString());
 });
 
 test('A8 MS_PER_DAY round-trip exact for +100 days', function () {

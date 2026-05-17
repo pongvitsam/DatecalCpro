@@ -4,6 +4,10 @@
 var MS_PER_DAY = 86400000;
 
 function startOfDay(date) {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        var parts = date.split('-');
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
     var d = date instanceof Date ? date : new Date(date);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }

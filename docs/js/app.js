@@ -79,7 +79,10 @@ function showToast(message, type) {
 
     const el = document.createElement('div');
     el.className = colors[type] + ' text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 toast-enter font-medium text-sm';
-    el.innerHTML = '<i class="ph ph-' + icons[type] + ' text-xl"></i> ' + message;
+    const icon = document.createElement('i');
+    icon.className = 'ph ph-' + icons[type] + ' text-xl';
+    el.appendChild(icon);
+    el.appendChild(document.createTextNode(' ' + message));
     container.appendChild(el);
 
     setTimeout(function () {
@@ -103,6 +106,10 @@ function formatThaiDate(date) {
 var MS_PER_DAY = 86400000;
 
 function startOfDay(date) {
+    if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const parts = date.split('-');
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
     const d = date instanceof Date ? date : new Date(date);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -268,6 +275,77 @@ function computeYmdDiff(startDate, endDate, countMode) {
     };
 }
 
+var BE_YEAR_OFFSET = 543;
+
+function syncFlatpickrBuddhistYear(instance) {
+    if (!instance || !instance.currentYearElement) {
+        return;
+    }
+    instance.currentYearElement.value = String(instance.currentYear + BE_YEAR_OFFSET);
+}
+
+function applyBuddhistYearFromInput(instance) {
+    if (!instance || !instance.currentYearElement) {
+        return;
+    }
+    const raw = parseInt(instance.currentYearElement.value, 10);
+    if (isNaN(raw)) {
+        syncFlatpickrBuddhistYear(instance);
+        return;
+    }
+    const ceYear = raw >= 2400 ? raw - BE_YEAR_OFFSET : raw;
+    if (ceYear !== instance.currentYear) {
+        instance.changeYear(ceYear);
+    }
+    syncFlatpickrBuddhistYear(instance);
+}
+
+function attachFlatpickrBuddhistYearInput(instance) {
+    syncFlatpickrBuddhistYear(instance);
+    const el = instance.currentYearElement;
+    if (!el || el._buddhistYearBound) {
+        return;
+    }
+    el._buddhistYearBound = true;
+    el.setAttribute('min', '2400');
+    el.setAttribute('max', '2700');
+    el.setAttribute('aria-label', 'ปี พ.ศ.');
+    el.addEventListener('blur', function () {
+        applyBuddhistYearFromInput(instance);
+    });
+    el.addEventListener('change', function () {
+        applyBuddhistYearFromInput(instance);
+    });
+    el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            applyBuddhistYearFromInput(instance);
+        }
+    });
+    el.addEventListener('input', function () {
+        if (el.value.length >= 4) {
+            applyBuddhistYearFromInput(instance);
+        }
+    });
+    var yearWrap = el.parentElement;
+    if (yearWrap) {
+        yearWrap.querySelectorAll('.arrowUp, .arrowDown').forEach(function (arrow) {
+            arrow.addEventListener('click', function () {
+                setTimeout(function () {
+                    applyBuddhistYearFromInput(instance);
+                }, 0);
+            });
+        });
+    }
+}
+
+function onFlatpickrBuddhistYearHook(selectedDates, dateStr, instance) {
+    attachFlatpickrBuddhistYearInput(instance);
+    syncFlatpickrBuddhistYear(instance);
+    setTimeout(function () {
+        syncFlatpickrBuddhistYear(instance);
+    }, 0);
+}
+
 function initDatePickers() {
     const fpConfig = {
         locale: 'th',
@@ -279,12 +357,17 @@ function initDatePickers() {
             if (selectedDates.length > 0) {
                 instance.altInput.value = formatThaiDate(selectedDates[0]);
             }
+            onFlatpickrBuddhistYearHook(selectedDates, dateStr, instance);
         },
         onReady: function (selectedDates, dateStr, instance) {
             if (selectedDates.length > 0) {
                 instance.altInput.value = formatThaiDate(selectedDates[0]);
             }
-        }
+            onFlatpickrBuddhistYearHook(selectedDates, dateStr, instance);
+        },
+        onOpen: onFlatpickrBuddhistYearHook,
+        onMonthChange: onFlatpickrBuddhistYearHook,
+        onYearChange: onFlatpickrBuddhistYearHook
     };
 
     window.fpShiftStart = flatpickr('#shiftStartDate', Object.assign({}, fpConfig, { defaultDate: new Date() }));
@@ -325,9 +408,9 @@ function calculateShift() {
     const op = document.getElementById('shiftOperation').value;
     const countMode = document.getElementById('shiftCountMode').value;
 
-    const days = parseInt(document.getElementById('shiftDays').value, 10) || 0;
-    const months = parseInt(document.getElementById('shiftMonths').value, 10) || 0;
-    const years = parseInt(document.getElementById('shiftYears').value, 10) || 0;
+    const days = Math.max(0, parseInt(document.getElementById('shiftDays').value, 10) || 0);
+    const months = Math.max(0, parseInt(document.getElementById('shiftMonths').value, 10) || 0);
+    const years = Math.max(0, parseInt(document.getElementById('shiftYears').value, 10) || 0);
 
     if (days === 0 && months === 0 && years === 0) {
         showToast('กรุณาระบุระยะเวลาอย่างน้อย 1 อย่าง', 'error');
@@ -335,7 +418,6 @@ function calculateShift() {
     }
 
     const isAdd = op === 'add';
-    const factor = isAdd ? 1 : -1;
 
     let resultDate;
     if (isAdd) {
@@ -538,7 +620,7 @@ function calculateDuration() {
     currentTempResult = {
         type: 'duration',
         label: 'หาระยะห่าง ' + modeText + ' [' + formatLabel + ']',
-        detail: formatThaiDate(originalD1) + ' ถึง ' + formatThaiDate(originalD2),
+        detail: formatThaiDate(rangeStart) + ' ถึง ' + formatThaiDate(rangeEnd),
         result: formatDurationResultText(years, months, days, totalDays, displayFormat),
         timestamp: new Date().toISOString()
     };
@@ -598,6 +680,9 @@ async function deleteHistory(id) {
 async function clearHistory() {
     if (dbHistory.length === 0) return;
     if (!apiReady) return;
+    if (!window.confirm('ล้างประวัติการคำนวณทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้')) {
+        return;
+    }
 
     try {
         await DateCalcApi.clearHistory();
@@ -683,9 +768,10 @@ function exportCSV() {
 
     dbHistory.forEach(function (item) {
         const dateStr = new Date(item.timestamp).toLocaleString('th-TH');
+        const label = '"' + String(item.label).replace(/"/g, '""') + '"';
         const detail = '"' + String(item.detail).replace(/"/g, '""') + '"';
         const result = '"' + String(item.result).replace(/"/g, '""') + '"';
-        csvContent += item.id + ',' + item.label + ',' + detail + ',' + result + ',' + dateStr + '\n';
+        csvContent += item.id + ',' + label + ',' + detail + ',' + result + ',' + dateStr + '\n';
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -705,15 +791,25 @@ function exportCSV() {
 function showApiBanner(message) {
     const banner = document.getElementById('apiBanner');
     const text = document.getElementById('apiBannerText');
+    const root = document.getElementById('appRoot');
     if (banner && text) {
         text.textContent = message;
         banner.classList.add('visible');
+    }
+    if (root) {
+        root.classList.add('api-banner-visible');
     }
 }
 
 function hideApiBanner() {
     const banner = document.getElementById('apiBanner');
-    if (banner) banner.classList.remove('visible');
+    const root = document.getElementById('appRoot');
+    if (banner) {
+        banner.classList.remove('visible');
+    }
+    if (root) {
+        root.classList.remove('api-banner-visible');
+    }
 }
 
 async function initApi() {

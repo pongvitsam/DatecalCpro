@@ -1,19 +1,19 @@
 /**
  * DateCalc Pro — API client (Google Apps Script Web App)
- * Uses text/plain POST to avoid CORS preflight issues with GAS.
+ * POST uses application/x-www-form-urlencoded (reliable with GAS redirect).
  */
 
 const DateCalcApi = (function () {
   const USER_ID_KEY = 'datecalc_user_id';
 
   function getUserId() {
-    let id = localStorage.getItem(USER_ID_KEY);
+    let id = DateCalcStorage.getItem(USER_ID_KEY);
     if (!id) {
       id =
         typeof crypto !== 'undefined' && crypto.randomUUID
           ? crypto.randomUUID()
           : 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      localStorage.setItem(USER_ID_KEY, id);
+      DateCalcStorage.setItem(USER_ID_KEY, id);
     }
     return id;
   }
@@ -22,10 +22,10 @@ const DateCalcApi = (function () {
     const cfg = window.APP_CONFIG;
     if (!cfg || !cfg.apiUrl || cfg.apiUrl.includes('YOUR_DEPLOYMENT')) {
       throw new Error(
-        'ยังไม่ได้ตั้งค่า API: คัดลอก docs/js/config.example.js เป็น config.js แล้วใส่ URL จาก GAS Deploy'
+        'ยังไม่ได้ตั้งค่า API: แก้ docs/js/config.js ใส่ URL จาก GAS Deploy'
       );
     }
-    return cfg.apiUrl;
+    return cfg.apiUrl.replace(/\/$/, '');
   }
 
   async function request(action, payload, method) {
@@ -36,24 +36,46 @@ const DateCalcApi = (function () {
       const url = new URL(apiUrl);
       Object.keys(body).forEach(function (k) {
         if (body[k] !== undefined && body[k] !== null) {
-          url.searchParams.set(k, typeof body[k] === 'object' ? JSON.stringify(body[k]) : String(body[k]));
+          const val = body[k];
+          url.searchParams.set(
+            k,
+            typeof val === 'object' ? JSON.stringify(val) : String(val)
+          );
         }
       });
-      const res = await fetch(url.toString(), { method: 'GET', redirect: 'follow' });
+      const res = await fetch(url.toString(), {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store'
+      });
       return parseResponse_(res);
     }
 
+    const formBody = 'payload=' + encodeURIComponent(JSON.stringify(body));
     const res = await fetch(apiUrl, {
       method: 'POST',
       redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body)
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8' },
+      body: formBody
     });
     return parseResponse_(res);
   }
 
   async function parseResponse_(res) {
     const text = await res.text();
+
+    if (!res.ok || text.trim().indexOf('<') === 0) {
+      if (res.status === 404) {
+        throw new Error(
+          'GAS Web App ไม่พบ (404) — ไป Deploy > Manage deployments > สร้างเวอร์ชันใหม่ แล้วอัปเดต URL ใน config.js'
+        );
+      }
+      throw new Error(
+        'API ตอบกลับไม่ถูกต้อง (HTTP ' + res.status + ') — ลองเปิด URL ในเบราว์เซอร์แล้ว Authorize'
+      );
+    }
+
     let json;
     try {
       json = JSON.parse(text);

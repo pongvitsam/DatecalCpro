@@ -17,9 +17,24 @@ function doPost(e) {
 function handleRequest_(e, method) {
   try {
   var params = method === 'POST' ? parsePostBody_(e) : (e && e.parameter ? e.parameter : {});
+
+  if (params.item && typeof params.item === 'string') {
+    try {
+      params.item = JSON.parse(params.item);
+    } catch (itemErr) {
+      /* keep string */
+    }
+  }
+
   var action = String(params.action || '').trim();
   if (!action) {
-    return jsonResponse_({ success: false, error: 'Missing action' });
+    return jsonResponse_({
+      success: true,
+      data: {
+        ok: true,
+        message: 'DateCalc Pro API — use ?action=ping'
+      }
+    });
   }
 
   switch (action) {
@@ -47,13 +62,26 @@ function handleRequest_(e, method) {
 }
 
 function parsePostBody_(e) {
-  if (!e || !e.postData || !e.postData.contents) {
+  if (!e) {
     return {};
   }
+
+  if (e.parameter && e.parameter.payload) {
+    try {
+      return JSON.parse(String(e.parameter.payload));
+    } catch (payloadErr) {
+      return {};
+    }
+  }
+
+  if (!e.postData || !e.postData.contents) {
+    return e.parameter || {};
+  }
+
   try {
     return JSON.parse(e.postData.contents);
   } catch (parseErr) {
-    return {};
+    return e.parameter || {};
   }
 }
 

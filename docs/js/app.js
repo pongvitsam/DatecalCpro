@@ -59,7 +59,7 @@ function applyThemeUI(isDark) {
 function toggleTheme() {
     const html = document.documentElement;
     const isDark = html.classList.toggle('dark');
-    localStorage.setItem('datecalc_theme', isDark ? 'dark' : 'light');
+    DateCalcStorage.setItem('datecalc_theme', isDark ? 'dark' : 'light');
     applyThemeUI(isDark);
 }
 
@@ -542,7 +542,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setInterval(updateLiveClock, 1000);
     updateLiveClock();
 
-    const savedTheme = localStorage.getItem('datecalc_theme');
+    const savedTheme = DateCalcStorage.getItem('datecalc_theme');
     let isDark = false;
     if (savedTheme === 'dark') {
         isDark = true;

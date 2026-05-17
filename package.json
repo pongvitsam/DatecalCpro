@@ -2,8 +2,9 @@
   "name": "datecalcpro",
   "private": true,
   "scripts": {
-    "test": "node tests/date-math.test.js && node tests/date-math-longspan.test.js",
+    "test": "node tests/date-math.test.js && node tests/date-math-longspan.test.js && node tests/date-math-century.test.js",
     "test:dates": "node tests/date-math.test.js",
-    "test:longspan": "node tests/date-math-longspan.test.js"
+    "test:longspan": "node tests/date-math-longspan.test.js",
+    "test:century": "node tests/date-math-century.test.js"
   }
 }

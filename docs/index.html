@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DateCalc Pro | ระบบคำนวณวันที่</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/th.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Prompt', 'sans-serif'] },
+                    colors: {
+                        rose: {
+                            50: '#fff1f2', 100: '#ffe4e6', 400: '#fb7185',
+                            500: '#f43f5e', 600: '#e11d48', 900: '#881337'
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-rose-50 via-white to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 text-slate-800 dark:text-slate-200">
+
+    <div id="apiBanner" class="fixed top-0 left-0 right-0 z-[60] bg-amber-500 text-white text-sm px-4 py-2 items-center justify-center gap-2 shadow-md">
+        <i class="ph ph-warning text-lg"></i>
+        <span id="apiBannerText">กำลังเชื่อมต่อ API...</span>
+    </div>
+
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-rose-300/20 dark:bg-rose-900/20 blur-3xl"></div>
+        <div class="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] rounded-full bg-purple-300/20 dark:bg-purple-900/20 blur-3xl"></div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    <div class="flex h-screen overflow-hidden pt-0" id="appRoot">
+
+        <aside id="sidebar" class="w-64 glass border-r border-white/20 dark:border-white/5 hidden md:flex flex-col transition-all duration-300 z-40 relative">
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-400 to-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-500/30">
+                    <i class="ph ph-calendar-check text-2xl"></i>
+                </div>
+                <h1 class="font-bold text-xl tracking-tight">DateCalc<span class="text-rose-500">Pro</span></h1>
+            </div>
+            <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+                <button type="button" onclick="switchView('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="dashboard"><i class="ph ph-squares-four text-xl text-rose-500"></i> แดชบอร์ด</button>
+                <button type="button" onclick="switchView('ai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="ai"><i class="ph ph-sparkle text-xl text-purple-500"></i> AI วิเคราะห์สัญญา</button>
+                <button type="button" onclick="switchView('shift')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="shift"><i class="ph ph-calendar-plus text-xl text-rose-500"></i> หาอดีต / อนาคต</button>
+                <button type="button" onclick="switchView('duration')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="duration"><i class="ph ph-arrows-left-right text-xl text-rose-500"></i> หาระยะห่าง</button>
+                <button type="button" onclick="switchView('history')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="history"><i class="ph ph-clock-counter-clockwise text-xl text-rose-500"></i> ประวัติการคำนวณ</button>
+                <button type="button" onclick="switchView('export')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="export"><i class="ph ph-export text-xl text-rose-500"></i> ส่งออกข้อมูล (CSV)</button>
+            </nav>
+            <div class="p-4 border-t border-gray-200/50 dark:border-gray-700/50">
+                <div class="glass p-4 rounded-xl text-center">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">แสดงผลโหมด</p>
+                    <button type="button" onclick="toggleTheme()" class="w-full py-2 rounded-lg bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-700 transition flex items-center justify-center gap-2 text-sm border border-gray-200 dark:border-gray-600">
+                        <i id="themeIcon" class="ph ph-moon text-lg"></i>
+                        <span id="themeText">โหมดกลางคืน</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col h-screen overflow-hidden">
+            <header class="md:hidden glass px-6 py-4 flex justify-between items-center z-30 relative">
+                <div class="flex items-center gap-2">
+                    <i class="ph ph-calendar-check text-2xl text-rose-500"></i>
+                    <h1 class="font-bold text-lg">DateCalc<span class="text-rose-500">Pro</span></h1>
+                </div>
+                <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-lg bg-white/50 dark:bg-slate-800/50"><i class="ph ph-list text-xl"></i></button>
+            </header>
+
+            <div id="mobileMenu" class="fixed inset-0 bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl z-50 flex-col hidden">
+                <div class="p-6 flex justify-between items-center border-b border-gray-200 dark:border-gray-800">
+                    <div class="flex items-center gap-2"><i class="ph ph-calendar-check text-2xl text-rose-500"></i><span class="font-bold text-xl">เมนู</span></div>
+                    <button type="button" onclick="toggleMobileMenu()" class="p-2 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-500"><i class="ph ph-x text-xl"></i></button>
+                </div>
+                <nav class="p-4 space-y-2 flex-1">
+                    <button type="button" onclick="switchView('dashboard'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-squares-four text-2xl text-rose-500"></i> แดชบอร์ด</button>
+                    <button type="button" onclick="switchView('ai'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-purple-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-sparkle text-2xl text-purple-500"></i> AI วิเคราะห์สัญญา</button>
+                    <button type="button" onclick="switchView('shift'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-calendar-plus text-2xl text-rose-500"></i> หาอดีต / อนาคต</button>
+                    <button type="button" onclick="switchView('duration'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-arrows-left-right text-2xl text-rose-500"></i> หาระยะห่าง</button>
+                    <button type="button" onclick="switchView('history'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-clock-counter-clockwise text-2xl text-rose-500"></i> ประวัติ</button>
+                    <button type="button" onclick="switchView('export'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-export text-2xl text-rose-500"></i> ส่งออกข้อมูล</button>
+                </nav>
+                <div class="p-6">
+                    <button type="button" onclick="toggleTheme()" class="w-full py-4 rounded-2xl bg-gray-100 dark:bg-slate-800 flex items-center justify-center gap-2 font-medium">
+                        <i id="themeIconMobile" class="ph ph-moon text-xl"></i> สลับโหมดสี
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 relative z-10 w-full max-w-5xl mx-auto">
+
+                <div id="view-dashboard" class="view-section hidden space-y-6 animate-fade-in">
+                    <div class="glass p-8 rounded-3xl relative overflow-hidden">
+                        <div class="relative z-10">
+                            <h2 class="text-3xl font-bold mb-2">ยินดีต้อนรับสู่ DateCalc Pro</h2>
+                            <p class="text-gray-600 dark:text-gray-300">เครื่องมือคำนวณวันที่ — ข้อมูลประวัติเก็บบน Google Apps Script</p>
+                        </div>
+                        <i class="ph ph-calendar-star text-[150px] absolute -bottom-10 -right-10 text-rose-500/10 dark:text-rose-500/20 transform rotate-12"></i>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glass p-6 rounded-3xl flex flex-col justify-center gap-2">
+                            <div class="flex items-center gap-3 mb-2">
+                                <div class="w-10 h-10 rounded-xl bg-rose-100 dark:bg-rose-900/40 flex items-center justify-center text-rose-500"><i class="ph ph-floppy-disk text-xl"></i></div>
+                                <h3 class="font-medium text-gray-500 dark:text-gray-400">ประวัติที่บันทึก</h3>
+                            </div>
+                            <p class="text-4xl font-bold text-gray-800 dark:text-white"><span id="statTotalSaved">0</span> <span class="text-lg font-normal text-gray-500">รายการ</span></p>
+                        </div>
+                        <div class="glass p-6 rounded-3xl flex items-start gap-4">
+                            <div class="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0 text-purple-500"><i class="ph ph-clock-user text-2xl"></i></div>
+                            <div>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 font-medium">วันและเวลาปัจจุบัน</p>
+                                <p id="liveDate" class="text-xl font-bold mt-1 text-gray-800 dark:text-white">-</p>
+                                <p id="liveTime" class="text-md font-medium text-rose-500 dark:text-rose-400">-</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div id="view-ai" class="view-section hidden space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-sparkle text-purple-500"></i> ผู้ช่วย AI วิเคราะห์สัญญา <span class="text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300 px-2 py-1 rounded-full font-medium ml-2">Gemini</span></h2>
+                    <div class="glass p-6 md:p-8 rounded-3xl space-y-6">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">วางข้อความสัญญาหรือเงื่อนไขเวลาที่นี่</label>
+                            <textarea id="aiInputText" rows="4" class="glass-input w-full px-4 py-3 rounded-xl resize-none" placeholder="วางข้อความที่ระบุวันที่ และระยะเวลา..."></textarea>
+                        </div>
+                        <button type="button" id="btnAiAnalyze" onclick="analyzeTextWithAI()" class="w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white"><i class="ph ph-magic-wand"></i> ให้ AI ช่วยวิเคราะห์</button>
+                        <div id="aiLoading" class="hidden flex flex-col items-center py-8"><i class="ph ph-spinner-gap text-4xl text-purple-500 animate-spin"></i><p class="text-sm text-gray-500 mt-4">AI กำลังวิเคราะห์...</p></div>
+                        <div id="aiResultArea" class="hidden mt-6 p-6 rounded-2xl bg-purple-50 dark:bg-slate-800 border border-purple-100 dark:border-purple-900/30">
+                            <h4 class="font-bold mb-2">ผลการวิเคราะห์</h4>
+                            <p id="aiExplanation" class="text-sm text-gray-600 dark:text-gray-300 mb-4"></p>
+                            <div id="aiExtractedData" class="grid grid-cols-2 sm:grid-cols-4 gap-3 hidden">
+                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">เริ่มต้น</p><p id="aiResStartDate" class="font-semibold text-sm mt-1">-</p></div>
+                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">ปี</p><p id="aiResYears" class="font-bold text-lg text-purple-600">0</p></div>
+                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">เดือน</p><p id="aiResMonths" class="font-bold text-lg text-purple-600">0</p></div>
+                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">วัน</p><p id="aiResDays" class="font-bold text-lg text-purple-600">0</p></div>
+                            </div>
+                            <div class="pt-4 flex justify-end"><button type="button" id="btnAiApply" onclick="applyAiToCalculator()" class="px-5 py-2.5 bg-purple-600 text-white text-sm rounded-xl hidden"><i class="ph ph-share-fat"></i> นำไปคำนวณทันที</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-shift" class="view-section hidden space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-calendar-plus text-rose-500"></i> หาอดีต / อนาคต</h2>
+                    <div class="glass p-6 md:p-8 rounded-3xl">
+                        <form id="formShift" onsubmit="event.preventDefault(); calculateShift();" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2"><label class="block text-sm font-medium">วันที่เริ่มต้น <span class="text-rose-500">*</span></label><input type="text" id="shiftStartDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer" placeholder="เลือกวันที่..."></div>
+                                <div class="space-y-2"><label class="block text-sm font-medium">การดำเนินการ</label><select id="shiftOperation" class="glass-input w-full px-4 py-3 rounded-xl"><option value="add">บวก (อนาคต)</option><option value="sub">ลบ (อดีต)</option></select></div>
+                            </div>
+                            <div class="space-y-2"><label class="block text-sm font-medium">รูปแบบการเริ่มนับ</label><select id="shiftCountMode" class="glass-input w-full px-4 py-3 rounded-xl"><option value="exclusive">นับถัดจากวันที่เลือกเป็นวันที่ 1</option><option value="inclusive">นับตั้งแต่วันที่เลือกเป็นวันที่ 1</option></select></div>
+                            <div class="p-5 rounded-2xl bg-white/20 dark:bg-black/20 border border-white/30 dark:border-white/5">
+                                <div class="flex flex-wrap gap-2 mb-4">
+                                    <button type="button" onclick="setQuickShift(7,0,0)" class="text-xs px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600">+7 วัน</button>
+                                    <button type="button" onclick="setQuickShift(30,0,0)" class="text-xs px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600">+30 วัน</button>
+                                    <button type="button" onclick="setQuickShift(0,0,1)" class="text-xs px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600">+1 ปี</button>
+                                    <button type="button" onclick="setQuickShift(0,0,0)" class="text-xs px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700">เคลียร์</button>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div><label class="block text-xs text-gray-500 mb-1">วัน</label><input type="number" id="shiftDays" min="0" value="0" class="glass-input w-full px-4 py-2 rounded-xl text-center text-lg font-semibold"></div>
+                                    <div><label class="block text-xs text-gray-500 mb-1">เดือน</label><input type="number" id="shiftMonths" min="0" value="0" class="glass-input w-full px-4 py-2 rounded-xl text-center text-lg font-semibold"></div>
+                                    <div><label class="block text-xs text-gray-500 mb-1">ปี</label><input type="number" id="shiftYears" min="0" value="0" class="glass-input w-full px-4 py-2 rounded-xl text-center text-lg font-semibold"></div>
+                                </div>
+                            </div>
+                            <button type="submit" class="glass-button w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2"><i class="ph ph-calculator"></i> คำนวณผลลัพธ์</button>
+                        </form>
+                        <div id="shiftResultArea" class="hidden mt-8 p-6 rounded-2xl bg-gradient-to-r from-rose-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 border border-rose-100 dark:border-rose-900/30">
+                            <h3 class="text-xl font-bold text-center mb-4">สรุปผลการคำนวณสัญญา</h3>
+                            <div class="bg-white/80 dark:bg-slate-900/80 p-5 rounded-xl space-y-4 text-sm md:text-base">
+                                <div class="flex flex-col md:flex-row md:justify-between border-b border-gray-100 dark:border-slate-700 pb-3"><span class="text-gray-500">วันที่เริ่มต้น:</span><span id="sumStartDate" class="font-semibold"></span></div>
+                                <div class="flex flex-col md:flex-row md:justify-between border-b border-gray-100 dark:border-slate-700 pb-3"><span class="text-gray-500">ระยะเวลา:</span><span id="sumDuration" class="font-semibold"></span></div>
+                                <div class="flex flex-col md:flex-row md:justify-between border-b border-gray-100 dark:border-slate-700 pb-3"><span class="text-gray-500">เงื่อนไข:</span><span id="sumCondition" class="font-semibold"></span></div>
+                                <div class="flex flex-col md:flex-row md:justify-between pt-2"><span class="text-rose-600 font-bold text-lg">วันที่สิ้นสุด:</span><div class="md:text-right"><span id="sumEndDate" class="text-2xl font-bold text-rose-600"></span><div id="weekendWarning" class="text-sm text-amber-600 mt-1.5 hidden flex items-center gap-1"><i class="ph ph-warning-circle"></i> ตรงวันเสาร์-อาทิตย์</div></div></div>
+                            </div>
+                            <div class="mt-6 flex justify-center"><button type="button" onclick="saveResult('shift')" class="px-5 py-2.5 bg-white dark:bg-slate-800 text-sm rounded-xl border flex items-center gap-2"><i class="ph ph-floppy-disk text-rose-500"></i> บันทึกลงประวัติ</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-duration" class="view-section hidden space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-arrows-left-right text-rose-500"></i> หาระยะห่างระหว่างวัน</h2>
+                    <div class="glass p-6 md:p-8 rounded-3xl">
+                        <form id="formDuration" onsubmit="event.preventDefault(); calculateDuration();" class="space-y-6">
+                            <div class="flex flex-col md:flex-row items-center gap-4">
+                                <div class="w-full space-y-2"><label class="block text-sm font-medium">วันที่เริ่มต้น</label><input type="text" id="durStartDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer"></div>
+                                <div class="hidden md:block pt-6"><i class="ph ph-arrow-right text-2xl text-gray-400"></i></div>
+                                <div class="w-full space-y-2"><label class="block text-sm font-medium">วันที่สิ้นสุด</label><input type="text" id="durEndDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer"></div>
+                            </div>
+                            <div class="space-y-2"><label class="block text-sm font-medium">รูปแบบการนับ</label><select id="durCountMode" class="glass-input w-full px-4 py-3 rounded-xl"><option value="inclusive">นับรวมวันเริ่มต้น</option><option value="exclusive">ไม่นับวันแรก</option></select></div>
+                            <button type="submit" class="glass-button w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2"><i class="ph ph-calculator"></i> คำนวณระยะห่าง</button>
+                        </form>
+                        <div id="durResultArea" class="hidden mt-8 p-6 rounded-2xl bg-gradient-to-r from-rose-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 border text-center">
+                            <p class="text-sm text-gray-500 mb-2">ระยะเวลาทั้งหมด</p>
+                            <div class="flex flex-wrap justify-center gap-8"><div><span id="resYear" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">ปี</span></div><div><span id="resMonth" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">เดือน</span></div><div><span id="resDay" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">วัน</span></div></div>
+                            <div class="mt-6 flex justify-center"><button type="button" onclick="saveResult('duration')" class="px-4 py-2 bg-white dark:bg-slate-800 text-sm rounded-lg border flex items-center gap-2"><i class="ph ph-floppy-disk text-rose-500"></i> บันทึกผลลัพธ์</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-history" class="view-section hidden space-y-6 animate-fade-in">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-clock-counter-clockwise text-rose-500"></i> ประวัติการคำนวณ</h2>
+                        <button type="button" onclick="clearHistory()" class="text-sm px-3 py-1.5 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600">ล้างประวัติ</button>
+                    </div>
+                    <div class="glass rounded-3xl overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead><tr class="bg-gray-50/50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-gray-700"><th class="p-4 text-sm">ประเภท</th><th class="p-4 text-sm">รายละเอียด</th><th class="p-4 text-sm">ผลลัพธ์</th><th class="p-4 text-sm text-right">จัดการ</th></tr></thead>
+                                <tbody id="historyTableBody" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+                            </table>
+                            <div id="emptyHistory" class="p-8 text-center text-gray-500 hidden"><i class="ph ph-database text-4xl mb-2 opacity-50"></i><p>ยังไม่มีประวัติ</p></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-export" class="view-section hidden space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-export text-rose-500"></i> ส่งออกข้อมูล</h2>
+                    <div class="glass p-8 rounded-3xl text-center max-w-xl mx-auto mt-10">
+                        <div class="w-20 h-20 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center text-green-500 mb-6"><i class="ph ph-file-csv text-4xl"></i></div>
+                        <h3 class="text-xl font-bold mb-2">ดาวน์โหลดรายงาน (CSV)</h3>
+                        <p class="text-gray-500 dark:text-gray-400 mb-8">ส่งออกประวัติทั้งหมดเป็นไฟล์ CSV</p>
+                        <button type="button" onclick="exportCSV()" class="glass-button w-full sm:w-auto px-8 py-3 rounded-xl font-medium text-lg inline-flex items-center justify-center gap-2"><i class="ph ph-download-simple"></i> ดาวน์โหลด .CSV</button>
+                    </div>
+                </div>
+
+
+            </div>
+        </main>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -174,12 +174,19 @@
                                 <div class="hidden md:block pt-6"><i class="ph ph-arrow-right text-2xl text-gray-400"></i></div>
                                 <div class="w-full space-y-2"><label class="block text-sm font-medium">วันที่สิ้นสุด</label><input type="text" id="durEndDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer"></div>
                             </div>
-                            <div class="space-y-2"><label class="block text-sm font-medium">รูปแบบการนับ</label><select id="durCountMode" class="glass-input w-full px-4 py-3 rounded-xl"><option value="inclusive">นับรวมวันเริ่มต้น</option><option value="exclusive">ไม่นับวันแรก</option></select></div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="space-y-2"><label class="block text-sm font-medium">รูปแบบการนับ</label><select id="durCountMode" class="glass-input w-full px-4 py-3 rounded-xl"><option value="inclusive">นับรวมวันเริ่มต้น</option><option value="exclusive">ไม่นับวันแรก</option></select></div>
+                                <div class="space-y-2"><label class="block text-sm font-medium">รูปแบบการแสดงผล</label><select id="durDisplayFormat" class="glass-input w-full px-4 py-3 rounded-xl"><option value="full">วัน เดือน ปี</option><option value="months">วัน และเดือน</option><option value="days">วันอย่างเดียว</option></select></div>
+                            </div>
                             <button type="submit" class="glass-button w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2"><i class="ph ph-calculator"></i> คำนวณระยะห่าง</button>
                         </form>
                         <div id="durResultArea" class="hidden mt-8 p-6 rounded-2xl bg-gradient-to-r from-rose-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 border text-center">
                             <p class="text-sm text-gray-500 mb-2">ระยะเวลาทั้งหมด</p>
-                            <div class="flex flex-wrap justify-center gap-8"><div><span id="resYear" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">ปี</span></div><div><span id="resMonth" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">เดือน</span></div><div><span id="resDay" class="text-4xl font-bold text-rose-600">0</span><span class="block text-sm">วัน</span></div></div>
+                            <div id="durResultValues" class="flex flex-wrap justify-center gap-8">
+                                <div id="resBlockYear" class="text-center"><span id="resYear" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span class="block text-sm text-gray-500">ปี</span></div>
+                                <div id="resBlockMonth" class="text-center"><span id="resMonth" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span class="block text-sm text-gray-500">เดือน</span></div>
+                                <div id="resBlockDay" class="text-center"><span id="resDay" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span id="resDayLabel" class="block text-sm text-gray-500">วัน</span></div>
+                            </div>
                             <div class="mt-6 flex justify-center"><button type="button" onclick="saveResult('duration')" class="px-4 py-2 bg-white dark:bg-slate-800 text-sm rounded-lg border flex items-center gap-2"><i class="ph ph-floppy-disk text-rose-500"></i> บันทึกผลลัพธ์</button></div>
                         </div>
                     </div>

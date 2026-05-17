@@ -220,6 +220,63 @@ function calculateShift() {
     };
 }
 
+function calcTotalDaysBetween(startDate, endDate, countMode) {
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+    let total = Math.round((end.getTime() - start.getTime()) / 86400000);
+    if (countMode === 'inclusive') {
+        total += 1;
+    }
+    return total < 0 ? 0 : total;
+}
+
+function formatDurationResultText(years, months, days, totalDays, displayFormat) {
+    if (displayFormat === 'days') {
+        return totalDays + ' วัน';
+    }
+    if (displayFormat === 'months') {
+        const totalMonths = years * 12 + months;
+        return totalMonths + ' เดือน ' + days + ' วัน';
+    }
+    return years + ' ปี ' + months + ' เดือน ' + days + ' วัน';
+}
+
+function renderDurationDisplay(years, months, days, totalDays, displayFormat) {
+    const blockYear = document.getElementById('resBlockYear');
+    const blockMonth = document.getElementById('resBlockMonth');
+    const blockDay = document.getElementById('resBlockDay');
+    const dayLabel = document.getElementById('resDayLabel');
+
+    if (!blockYear || !blockMonth || !blockDay) {
+        return;
+    }
+
+    blockYear.classList.add('hidden');
+    blockMonth.classList.add('hidden');
+    blockDay.classList.remove('hidden');
+
+    if (displayFormat === 'days') {
+        document.getElementById('resDay').innerText = totalDays;
+        if (dayLabel) dayLabel.innerText = 'วัน';
+        return;
+    }
+
+    if (displayFormat === 'months') {
+        blockMonth.classList.remove('hidden');
+        document.getElementById('resMonth').innerText = years * 12 + months;
+        document.getElementById('resDay').innerText = days;
+        if (dayLabel) dayLabel.innerText = 'วัน';
+        return;
+    }
+
+    blockYear.classList.remove('hidden');
+    blockMonth.classList.remove('hidden');
+    document.getElementById('resYear').innerText = years;
+    document.getElementById('resMonth').innerText = months;
+    document.getElementById('resDay').innerText = days;
+    if (dayLabel) dayLabel.innerText = 'วัน';
+}
+
 function calculateDuration() {
     const sd = window.fpDurStart.selectedDates;
     const ed = window.fpDurEnd.selectedDates;
@@ -261,18 +318,23 @@ function calculateDuration() {
         months += 12;
     }
 
-    document.getElementById('resYear').innerText = years;
-    document.getElementById('resMonth').innerText = months;
-    document.getElementById('resDay').innerText = days;
+    const displayFormat = document.getElementById('durDisplayFormat').value;
+    const totalDays = calcTotalDaysBetween(originalD1, originalD2, countMode);
+
+    renderDurationDisplay(years, months, days, totalDays, displayFormat);
     document.getElementById('durResultArea').classList.remove('hidden');
 
     const modeText = countMode === 'inclusive' ? '(นับรวมวันเริ่มต้น)' : '(ระยะห่างปกติ)';
+    const formatLabels = { full: 'วันเดือนปี', months: 'วันและเดือน', days: 'วันอย่างเดียว' };
+    const formatLabel = formatLabels[displayFormat] || displayFormat;
+
+    window._lastDurationParts = { years: years, months: months, days: days, totalDays: totalDays };
 
     currentTempResult = {
         type: 'duration',
-        label: 'หาระยะห่าง ' + modeText,
+        label: 'หาระยะห่าง ' + modeText + ' [' + formatLabel + ']',
         detail: formatThaiDate(originalD1) + ' ถึง ' + formatThaiDate(originalD2),
-        result: years + ' ปี ' + months + ' เดือน ' + days + ' วัน',
+        result: formatDurationResultText(years, months, days, totalDays, displayFormat),
         timestamp: new Date().toISOString()
     };
 }
@@ -485,4 +547,34 @@ document.addEventListener('DOMContentLoaded', function () {
     applyThemeUI(isDark);
 
     initApi();
+
+    const durDisplayFormat = document.getElementById('durDisplayFormat');
+    if (durDisplayFormat) {
+        durDisplayFormat.addEventListener('change', function () {
+            const parts = window._lastDurationParts;
+            const area = document.getElementById('durResultArea');
+            if (!parts || !area || area.classList.contains('hidden')) {
+                return;
+            }
+            renderDurationDisplay(
+                parts.years,
+                parts.months,
+                parts.days,
+                parts.totalDays,
+                durDisplayFormat.value
+            );
+            if (currentTempResult && currentTempResult.type === 'duration') {
+                const formatLabels = { full: 'วันเดือนปี', months: 'วันและเดือน', days: 'วันอย่างเดียว' };
+                currentTempResult.result = formatDurationResultText(
+                    parts.years,
+                    parts.months,
+                    parts.days,
+                    parts.totalDays,
+                    durDisplayFormat.value
+                );
+                currentTempResult.label =
+                    currentTempResult.label.replace(/\[[^\]]+\]/, '[' + (formatLabels[durDisplayFormat.value] || '') + ']');
+            }
+        });
+    }
 });

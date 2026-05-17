@@ -406,6 +406,17 @@ function updateDashboard() {
     document.getElementById('statTotalSaved').innerText = dbHistory.length;
 }
 
+function formatUserError(message) {
+    const msg = String(message || '');
+    if (msg.indexOf('429') !== -1 || msg.indexOf('โควต้า') !== -1) {
+        return 'โควต้า Gemini เต็ม — รอ 1–2 นาทีแล้วลองใหม่ หรือตรวจสอบแผนที่ Google AI Studio';
+    }
+    if (msg.length > 120) {
+        return msg.substring(0, 117) + '...';
+    }
+    return msg;
+}
+
 async function analyzeTextWithAI() {
     const textInput = document.getElementById('aiInputText').value.trim();
     if (!textInput) {
@@ -443,7 +454,12 @@ async function analyzeTextWithAI() {
 
         document.getElementById('aiResultArea').classList.remove('hidden');
     } catch (err) {
-        showToast(err.message || 'ไม่สามารถเชื่อมต่อระบบ AI ได้', 'error');
+        const friendly = formatUserError(err.message);
+        document.getElementById('aiExplanation').innerText = friendly;
+        document.getElementById('aiExtractedData').classList.add('hidden');
+        document.getElementById('btnAiApply').classList.add('hidden');
+        document.getElementById('aiResultArea').classList.remove('hidden');
+        showToast(friendly, 'error');
     } finally {
         document.getElementById('aiLoading').classList.add('hidden');
         document.getElementById('btnAiAnalyze').disabled = false;

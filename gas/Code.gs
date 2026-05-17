@@ -263,6 +263,28 @@ function getGeminiApiKey_() {
   return key;
 }
 
+function geminiErrorMessage_(code, body) {
+  if (code === 429) {
+    return (
+      'โควต้า Gemini API เต็ม (429) — รอสักครู่แล้วลองใหม่ หรือตรวจสอบแผน/บิลลิ่งที่ ' +
+      'https://ai.google.dev/gemini-api/docs/rate-limits'
+    );
+  }
+  if (code === 403) {
+    return 'API Key ไม่ถูกต้องหรือไม่มีสิทธิ์ใช้ Gemini (403)';
+  }
+  if (code === 400) {
+    return 'คำขอไม่ถูกต้อง (400) — ลองย่อข้อความสัญญา';
+  }
+  try {
+    var errJson = JSON.parse(body);
+    if (errJson.error && errJson.error.message) {
+      return 'Gemini: ' + errJson.error.message;
+    }
+  } catch (ignore) {}
+  return 'Gemini API error (' + code + ')';
+}
+
 function analyzeWithGemini_(params) {
   var textInput = String((params && params.text) || '').trim();
   if (!textInput) {
@@ -270,13 +292,7 @@ function analyzeWithGemini_(params) {
   }
 
   var apiKey = getGeminiApiKey_();
-  var model = 'gemini-2.0-flash';
-  var apiUrl =
-    'https://generativelanguage.googleapis.com/v1beta/models/' +
-    model +
-    ':generateContent?key=' +
-    encodeURIComponent(apiKey);
-
+  var models = ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-2.0-flash'];
   var currentDate = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
 
   var payload = {
@@ -328,25 +344,41 @@ function analyzeWithGemini_(params) {
     muteHttpExceptions: true
   };
 
-  var response = UrlFetchApp.fetch(apiUrl, options);
-  var code = response.getResponseCode();
-  var body = response.getContentText();
+  var lastError = 'Gemini API ไม่ตอบสนอง';
+  var m;
 
-  if (code < 200 || code >= 300) {
-    throw new Error('Gemini API error (' + code + '): ' + body.substring(0, 200));
+  for (m = 0; m < models.length; m++) {
+    var apiUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/' +
+      models[m] +
+      ':generateContent?key=' +
+      encodeURIComponent(apiKey);
+
+    var response = UrlFetchApp.fetch(apiUrl, options);
+    var code = response.getResponseCode();
+    var body = response.getContentText();
+
+    if (code >= 200 && code < 300) {
+      var parsed = JSON.parse(body);
+      if (
+        parsed.candidates &&
+        parsed.candidates[0] &&
+        parsed.candidates[0].content &&
+        parsed.candidates[0].content.parts &&
+        parsed.candidates[0].content.parts[0]
+      ) {
+        return JSON.parse(parsed.candidates[0].content.parts[0].text);
+      }
+      lastError = 'Invalid Gemini response structure';
+      continue;
+    }
+
+    lastError = geminiErrorMessage_(code, body);
+
+    if (code !== 429) {
+      throw new Error(lastError);
+    }
   }
 
-  var parsed = JSON.parse(body);
-  if (
-    !parsed.candidates ||
-    !parsed.candidates[0] ||
-    !parsed.candidates[0].content ||
-    !parsed.candidates[0].content.parts ||
-    !parsed.candidates[0].content.parts[0]
-  ) {
-    throw new Error('Invalid Gemini response structure');
-  }
-
-  var aiData = JSON.parse(parsed.candidates[0].content.parts[0].text);
-  return aiData;
+  throw new Error(lastError);
 }

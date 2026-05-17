@@ -139,6 +139,78 @@ function addYmdToDate(baseDate, years, months, days, factor) {
     return addCalendarYmd(baseDate, years, months, days, factor);
 }
 
+function findEndDateForYmd(startDate, years, months, days, countMode, preferredEnd) {
+    var start = startOfDay(startDate);
+    var approx = addCalendarYmd(start, years, months, days, 1);
+    var windowDays = 31;
+    var matches = [];
+
+    for (var delta = -windowDays; delta <= windowDays; delta++) {
+        var trial = startOfDay(new Date(approx.getTime() + delta * MS_PER_DAY));
+        if (trial < start) {
+            continue;
+        }
+        var ymd = computeYmdDiff(start, trial, countMode);
+        if (ymd.years === years && ymd.months === months && ymd.days === days) {
+            matches.push({
+                trial: trial,
+                dist: Math.abs(trial.getTime() - approx.getTime())
+            });
+        }
+    }
+
+    if (preferredEnd) {
+        var pref = startOfDay(preferredEnd);
+        for (var i = 0; i < matches.length; i++) {
+            if (matches[i].trial.getTime() === pref.getTime()) {
+                return pref;
+            }
+        }
+    }
+
+    if (matches.length > 0) {
+        matches.sort(function (a, b) {
+            var t = a.trial.getTime() - b.trial.getTime();
+            if (t !== 0) {
+                return t;
+            }
+            return a.dist - b.dist;
+        });
+        return matches[0].trial;
+    }
+
+    var best = null;
+
+    var fallback = startOfDay(approx);
+    if (countMode === 'inclusive') {
+        fallback.setDate(fallback.getDate() - 1);
+        fallback = startOfDay(fallback);
+    }
+    return fallback;
+}
+
+function findStartDateForYmd(endDate, years, months, days, countMode, preferredStart) {
+    var end = startOfDay(endDate);
+
+    if (preferredStart) {
+        var start = startOfDay(preferredStart);
+        var ymd = computeYmdDiff(start, end, countMode);
+        if (ymd.years === years && ymd.months === months && ymd.days === days) {
+            var fwd = findEndDateForYmd(start, years, months, days, countMode, end);
+            if (fwd.getTime() === end.getTime()) {
+                return start;
+            }
+        }
+    }
+
+    var endCalc = end;
+    if (countMode === 'inclusive') {
+        endCalc = startOfDay(end);
+        endCalc.setDate(endCalc.getDate() + 1);
+    }
+    return subtractCalendarYmd(endCalc, years, months, days, preferredStart);
+}
+
 function computeYmdDiff(startDate, endDate, countMode) {
     var d1 = startOfDay(startDate);
     var d2 = startOfDay(endDate);
@@ -184,19 +256,9 @@ function totalDaysFromBreakdown(startDate, years, months, days, countMode, endDa
 function shiftEndDate(start, years, months, days, isAdd, countMode, subtractAnchor) {
     var base = startOfDay(start);
     if (isAdd) {
-        var result = addCalendarYmd(base, years, months, days, 1);
-        if (countMode === 'inclusive') {
-            result.setDate(result.getDate() - 1);
-        }
-        return startOfDay(result);
+        return findEndDateForYmd(base, years, months, days, countMode, subtractAnchor);
     }
-    var endCalc = base;
-    if (countMode === 'inclusive') {
-        endCalc = new Date(base);
-        endCalc.setDate(endCalc.getDate() + 1);
-        endCalc = startOfDay(endCalc);
-    }
-    return subtractCalendarYmd(endCalc, years, months, days, subtractAnchor);
+    return findStartDateForYmd(base, years, months, days, countMode, subtractAnchor);
 }
 
 function fmt(d) {
@@ -218,6 +280,8 @@ module.exports = {
     addCalendarYmd: addCalendarYmd,
     subtractCalendarYmd: subtractCalendarYmd,
     addYmdToDate: addYmdToDate,
+    findEndDateForYmd: findEndDateForYmd,
+    findStartDateForYmd: findStartDateForYmd,
     computeYmdDiff: computeYmdDiff,
     totalDaysFromBreakdown: totalDaysFromBreakdown,
     shiftEndDate: shiftEndDate,

@@ -238,6 +238,77 @@ function addYmdToDate(baseDate, years, months, days, factor) {
     return addCalendarYmd(baseDate, years, months, days, factor);
 }
 
+/** หาวันปลายที่ตรงกับช่วง ปี/เดือน/วัน ตาม computeYmdDiff (สัญญายาว 50–60 ปี) */
+function findEndDateForYmd(startDate, years, months, days, countMode, preferredEnd) {
+    const start = startOfDay(startDate);
+    const approx = addCalendarYmd(start, years, months, days, 1);
+    const windowDays = 31;
+    const matches = [];
+
+    for (let delta = -windowDays; delta <= windowDays; delta++) {
+        const trial = startOfDay(new Date(approx.getTime() + delta * MS_PER_DAY));
+        if (trial < start) {
+            continue;
+        }
+        const ymd = computeYmdDiff(start, trial, countMode);
+        if (ymd.years === years && ymd.months === months && ymd.days === days) {
+            matches.push({
+                trial: trial,
+                dist: Math.abs(trial.getTime() - approx.getTime())
+            });
+        }
+    }
+
+    if (preferredEnd) {
+        const pref = startOfDay(preferredEnd);
+        for (let i = 0; i < matches.length; i++) {
+            if (matches[i].trial.getTime() === pref.getTime()) {
+                return pref;
+            }
+        }
+    }
+
+    if (matches.length > 0) {
+        matches.sort(function (a, b) {
+            const t = a.trial.getTime() - b.trial.getTime();
+            if (t !== 0) {
+                return t;
+            }
+            return a.dist - b.dist;
+        });
+        return matches[0].trial;
+    }
+
+    let fallback = startOfDay(approx);
+    if (countMode === 'inclusive') {
+        fallback.setDate(fallback.getDate() - 1);
+        fallback = startOfDay(fallback);
+    }
+    return fallback;
+}
+
+function findStartDateForYmd(endDate, years, months, days, countMode, preferredStart) {
+    const end = startOfDay(endDate);
+
+    if (preferredStart) {
+        const start = startOfDay(preferredStart);
+        const ymd = computeYmdDiff(start, end, countMode);
+        if (ymd.years === years && ymd.months === months && ymd.days === days) {
+            const fwd = findEndDateForYmd(start, years, months, days, countMode, end);
+            if (fwd.getTime() === end.getTime()) {
+                return start;
+            }
+        }
+    }
+
+    let endCalc = end;
+    if (countMode === 'inclusive') {
+        endCalc = startOfDay(end);
+        endCalc.setDate(endCalc.getDate() + 1);
+    }
+    return subtractCalendarYmd(endCalc, years, months, days, preferredStart);
+}
+
 /** แยกระยะห่างเป็น ปี เดือน วัน */
 function computeYmdDiff(startDate, endDate, countMode) {
     let d1 = startOfDay(startDate);
@@ -421,18 +492,9 @@ function calculateShift() {
 
     let resultDate;
     if (isAdd) {
-        resultDate = addCalendarYmd(startDate, years, months, days, 1);
-        if (countMode === 'inclusive') {
-            resultDate.setDate(resultDate.getDate() - 1);
-        }
-        resultDate = startOfDay(resultDate);
+        resultDate = findEndDateForYmd(startDate, years, months, days, countMode, null);
     } else {
-        let endCalc = startDate;
-        if (countMode === 'inclusive') {
-            endCalc = startOfDay(startDate);
-            endCalc.setDate(endCalc.getDate() + 1);
-        }
-        resultDate = subtractCalendarYmd(endCalc, years, months, days, startDate);
+        resultDate = findStartDateForYmd(startDate, years, months, days, countMode, startDate);
     }
 
     const thaiFormatEnd = formatThaiDate(resultDate);

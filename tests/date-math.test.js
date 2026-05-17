@@ -167,7 +167,7 @@ FIXTURES.forEach(function (fx, i) {
         var s = d(fx.s[0], fx.s[1], fx.s[2]);
         var e = d(fx.e[0], fx.e[1], fx.e[2]);
         var ymd = computeYmdDiff(s, e, 'inclusive');
-        var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'inclusive');
+        var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'inclusive', e);
         return assert(sameDay(end, e), 'shift got ' + fmt(end) + ' want ' + fmt(e));
     });
 });
@@ -331,7 +331,7 @@ runFuzzProperty('F3 fuzz: shift forward inclusive lands on end', 3000, function 
         return null;
     }
     var ymd = computeYmdDiff(p.start, p.end, 'inclusive');
-    var end = shiftEndDate(p.start, ymd.years, ymd.months, ymd.days, true, 'inclusive');
+    var end = shiftEndDate(p.start, ymd.years, ymd.months, ymd.days, true, 'inclusive', p.end);
     if (!sameDay(end, p.end)) {
         return 'shift ' + fmt(p.start) + '+' + JSON.stringify(ymd) + ' -> ' + fmt(end) + ' want ' + fmt(p.end);
     }
@@ -436,7 +436,7 @@ test('H1 duration ymd then exclusive shift matches end', function () {
     var s = d(2026, 4, 17);
     var e = d(2027, 0, 6);
     var ymd = computeYmdDiff(s, e, 'exclusive');
-    var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'exclusive');
+    var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'exclusive', e);
     return assert(sameDay(end, e), fmt(end) + ' vs ' + fmt(e));
 });
 
@@ -460,7 +460,7 @@ test('H4 leap day shift round-trip inclusive', function () {
     var s = d(1988, 1, 29);
     var e = d(2003, 5, 15);
     var ymd = computeYmdDiff(s, e, 'inclusive');
-    var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'inclusive');
+    var end = shiftEndDate(s, ymd.years, ymd.months, ymd.days, true, 'inclusive', e);
     return assert(sameDay(end, e), fmt(end) + ' vs ' + fmt(e));
 });
 

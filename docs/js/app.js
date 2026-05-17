@@ -95,10 +95,86 @@ function showToast(message, type) {
 function formatThaiDate(date) {
     if (!date) return '-';
     const thaiMonths = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    const d = date.getDate();
-    const m = thaiMonths[date.getMonth()];
-    const y = date.getFullYear() + 543;
-    return d + ' ' + m + ' ' + y;
+    const d = startOfDay(date);
+    return d.getDate() + ' ' + thaiMonths[d.getMonth()] + ' ' + (d.getFullYear() + 543);
+}
+
+/** คงที่สำหรับคำนวณวัน — ตัดเวลาเป็น 00:00:00.000 */
+var MS_PER_DAY = 86400000;
+
+function startOfDay(date) {
+    const d = date instanceof Date ? date : new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** จำนวนวันปฏิทินระหว่าง 2 วัน (midnight + Math.round) */
+function diffCalendarDays(fromDate, toDate) {
+    const from = startOfDay(fromDate);
+    const to = startOfDay(toDate);
+    return Math.round((to.getTime() - from.getTime()) / MS_PER_DAY);
+}
+
+/** ระยะห่างรวมตามโหมดนับ */
+function totalDaysBetween(startDate, endDate, countMode) {
+    let start = startOfDay(startDate);
+    let end = startOfDay(endDate);
+    if (start > end) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+    }
+    let total = diffCalendarDays(start, end);
+    if (countMode === 'inclusive') {
+        total += 1;
+    }
+    return total < 0 ? 0 : total;
+}
+
+/** บวก/ลบ ปี เดือน วัน จากวันที่ตั้งต้น (เที่ยงคืน) */
+function addYmdToDate(baseDate, years, months, days, factor) {
+    const f = factor || 1;
+    const result = startOfDay(baseDate);
+    result.setFullYear(result.getFullYear() + years * f);
+    result.setMonth(result.getMonth() + months * f);
+    result.setDate(result.getDate() + days * f);
+    return result;
+}
+
+/** แยกระยะห่างเป็น ปี เดือน วัน */
+function computeYmdDiff(startDate, endDate, countMode) {
+    let d1 = startOfDay(startDate);
+    let d2 = startOfDay(endDate);
+
+    if (d1 > d2) {
+        const tmp = d1;
+        d1 = d2;
+        d2 = tmp;
+    }
+
+    const endCalc = new Date(d2);
+    if (countMode === 'inclusive') {
+        endCalc.setDate(endCalc.getDate() + 1);
+    }
+
+    let years = endCalc.getFullYear() - d1.getFullYear();
+    let months = endCalc.getMonth() - d1.getMonth();
+    let days = endCalc.getDate() - d1.getDate();
+
+    if (days < 0) {
+        months--;
+        days += new Date(endCalc.getFullYear(), endCalc.getMonth(), 0).getDate();
+    }
+
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    return {
+        years: years < 0 ? 0 : years,
+        months: months < 0 ? 0 : months,
+        days: days < 0 ? 0 : days
+    };
 }
 
 function initDatePickers() {
@@ -154,7 +230,7 @@ function calculateShift() {
         return;
     }
 
-    const startDate = new Date(selectedDates[0]);
+    const startDate = startOfDay(selectedDates[0]);
     const op = document.getElementById('shiftOperation').value;
     const countMode = document.getElementById('shiftCountMode').value;
 
@@ -167,21 +243,16 @@ function calculateShift() {
         return;
     }
 
-    let resultDate = new Date(startDate);
     const isAdd = op === 'add';
     const factor = isAdd ? 1 : -1;
 
-    resultDate.setFullYear(resultDate.getFullYear() + years * factor);
-    resultDate.setMonth(resultDate.getMonth() + months * factor);
-    resultDate.setDate(resultDate.getDate() + days * factor);
+    let resultDate = addYmdToDate(startDate, years, months, days, factor);
 
     if (countMode === 'inclusive') {
-        if (isAdd) {
-            resultDate.setDate(resultDate.getDate() - 1);
-        } else {
-            resultDate.setDate(resultDate.getDate() + 1);
-        }
+        resultDate.setDate(resultDate.getDate() + (isAdd ? -1 : 1));
     }
+
+    resultDate = startOfDay(resultDate);
 
     const thaiFormatEnd = formatThaiDate(resultDate);
     const thaiFormatStart = formatThaiDate(startDate);
@@ -220,15 +291,11 @@ function calculateShift() {
     };
 }
 
-/** แปลง ปี+เดือน+วัน จากวันเริ่มต้น เป็นจำนวนวันรวม (ปฏิทินจริง) */
+/** แปลง ปี+เดือน+วัน เป็นจำนวนวันรวม (midnight + Math.round) */
 function totalDaysFromBreakdown(startDate, years, months, days, countMode) {
-    const from = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    const to = new Date(from);
-    to.setFullYear(to.getFullYear() + years);
-    to.setMonth(to.getMonth() + months);
-    to.setDate(to.getDate() + days);
-
-    let total = Math.round((to.getTime() - from.getTime()) / 86400000);
+    const from = startOfDay(startDate);
+    const to = addYmdToDate(from, years, months, days, 1);
+    let total = diffCalendarDays(from, to);
     if (countMode === 'inclusive') {
         total += 1;
     }
@@ -257,7 +324,8 @@ function setResultBlockVisible(el, visible) {
     }
 }
 
-function renderDurationDisplay(years, months, days, totalDays, displayFormat) {
+function renderDurationDisplay(years, months, days, totalDays, displayFormat, meta) {
+    meta = meta || {};
     const blockYear = document.getElementById('resBlockYear');
     const blockMonth = document.getElementById('resBlockMonth');
     const blockDay = document.getElementById('resBlockDay');
@@ -279,7 +347,16 @@ function renderDurationDisplay(years, months, days, totalDays, displayFormat) {
         if (dayLabel) dayLabel.innerText = 'วันรวม';
         if (resultTitle) {
             resultTitle.innerText =
-                'รวม ' + years + ' ปี ' + months + ' เดือน ' + days + ' วัน = ' + totalDays + ' วัน';
+                'ช่วงที่เลือก ' +
+                (meta.totalDaysCalendar != null ? meta.totalDaysCalendar : totalDays) +
+                ' วัน' +
+                ' (แยกเป็น ' +
+                years +
+                ' ปี ' +
+                months +
+                ' เดือน ' +
+                days +
+                ' วัน)';
         }
         return;
     }
@@ -316,42 +393,25 @@ function calculateDuration() {
         return;
     }
 
-    let d1 = new Date(sd[0]);
-    let d2 = new Date(ed[0]);
-
-    if (d1 > d2) {
-        const temp = d1;
-        d1 = d2;
-        d2 = temp;
-    }
-
     const countMode = document.getElementById('durCountMode').value;
-    const originalD1 = new Date(d1);
-    const originalD2 = new Date(d2);
+    const originalD1 = startOfDay(sd[0]);
+    const originalD2 = startOfDay(ed[0]);
 
-    if (countMode === 'inclusive') {
-        d2.setDate(d2.getDate() + 1);
-    }
-
-    let years = d2.getFullYear() - d1.getFullYear();
-    let months = d2.getMonth() - d1.getMonth();
-    let days = d2.getDate() - d1.getDate();
-
-    if (days < 0) {
-        months--;
-        const tempDate = new Date(d2.getFullYear(), d2.getMonth(), 0);
-        days += tempDate.getDate();
-    }
-
-    if (months < 0) {
-        years--;
-        months += 12;
-    }
+    const ymd = computeYmdDiff(originalD1, originalD2, countMode);
+    const years = ymd.years;
+    const months = ymd.months;
+    const days = ymd.days;
 
     const displayFormat = document.getElementById('durDisplayFormat').value;
-    const totalDays = totalDaysFromBreakdown(originalD1, years, months, days, countMode);
+    const totalDaysCalendar = totalDaysBetween(originalD1, originalD2, countMode);
+    const totalDays =
+        displayFormat === 'days'
+            ? totalDaysCalendar
+            : totalDaysFromBreakdown(originalD1, years, months, days, countMode);
 
-    renderDurationDisplay(years, months, days, totalDays, displayFormat);
+    renderDurationDisplay(years, months, days, totalDays, displayFormat, {
+        totalDaysCalendar: totalDaysCalendar
+    });
     document.getElementById('durResultArea').classList.remove('hidden');
 
     const modeText = countMode === 'inclusive' ? '(นับรวมวันเริ่มต้น)' : '(ระยะห่างปกติ)';
@@ -363,7 +423,9 @@ function calculateDuration() {
         months: months,
         days: days,
         totalDays: totalDays,
+        totalDaysCalendar: totalDaysCalendar,
         startTime: originalD1.getTime(),
+        endTime: originalD2.getTime(),
         countMode: countMode
     };
 
@@ -593,21 +655,23 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!parts || !area || area.classList.contains('hidden')) {
                 return;
             }
-            const totalDays = totalDaysFromBreakdown(
-                new Date(parts.startTime),
-                parts.years,
-                parts.months,
-                parts.days,
-                parts.countMode
-            );
+            const start = startOfDay(new Date(parts.startTime));
+            const end = startOfDay(new Date(parts.endTime));
+            const totalDaysCalendar = totalDaysBetween(start, end, parts.countMode);
+            const totalDays =
+                durDisplayFormat.value === 'days'
+                    ? totalDaysCalendar
+                    : totalDaysFromBreakdown(start, parts.years, parts.months, parts.days, parts.countMode);
             parts.totalDays = totalDays;
+            parts.totalDaysCalendar = totalDaysCalendar;
 
             renderDurationDisplay(
                 parts.years,
                 parts.months,
                 parts.days,
                 totalDays,
-                durDisplayFormat.value
+                durDisplayFormat.value,
+                { totalDaysCalendar: totalDaysCalendar }
             );
             if (currentTempResult && currentTempResult.type === 'duration') {
                 const formatLabels = { full: 'วันเดือนปี', months: 'วันและเดือน', days: 'วันอย่างเดียว' };

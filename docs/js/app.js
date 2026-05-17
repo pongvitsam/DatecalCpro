@@ -1,7 +1,6 @@
 let currentView = 'dashboard';
 let dbHistory = [];
 let currentTempResult = null;
-let lastAiExtractedData = null;
 let apiReady = false;
 
 function switchView(viewName) {
@@ -404,91 +403,6 @@ function renderHistory() {
 
 function updateDashboard() {
     document.getElementById('statTotalSaved').innerText = dbHistory.length;
-}
-
-function formatUserError(message) {
-    const msg = String(message || '');
-    if (msg.indexOf('429') !== -1 || msg.indexOf('โควต้า') !== -1) {
-        return 'โควต้า Gemini เต็ม — รอ 1–2 นาทีแล้วลองใหม่ หรือตรวจสอบแผนที่ Google AI Studio';
-    }
-    if (msg.length > 120) {
-        return msg.substring(0, 117) + '...';
-    }
-    return msg;
-}
-
-async function analyzeTextWithAI() {
-    const textInput = document.getElementById('aiInputText').value.trim();
-    if (!textInput) {
-        showToast('กรุณาวางข้อความสัญญาที่ต้องการวิเคราะห์', 'error');
-        return;
-    }
-
-    if (!apiReady) {
-        showToast('API ยังไม่พร้อม — ตรวจสอบ config.js', 'error');
-        return;
-    }
-
-    document.getElementById('aiLoading').classList.remove('hidden');
-    document.getElementById('aiResultArea').classList.add('hidden');
-    document.getElementById('btnAiAnalyze').disabled = true;
-
-    try {
-        const aiData = await DateCalcApi.analyzeAI(textInput);
-
-        document.getElementById('aiExplanation').innerText = aiData.explanation || '';
-
-        if (aiData.hasDateInfo) {
-            lastAiExtractedData = aiData;
-            document.getElementById('aiExtractedData').classList.remove('hidden');
-            document.getElementById('btnAiApply').classList.remove('hidden');
-            document.getElementById('aiResStartDate').innerText = aiData.startDate || 'อิงตามที่เลือกไว้';
-            document.getElementById('aiResYears').innerText = aiData.years || 0;
-            document.getElementById('aiResMonths').innerText = aiData.months || 0;
-            document.getElementById('aiResDays').innerText = aiData.days || 0;
-        } else {
-            lastAiExtractedData = null;
-            document.getElementById('aiExtractedData').classList.add('hidden');
-            document.getElementById('btnAiApply').classList.add('hidden');
-        }
-
-        document.getElementById('aiResultArea').classList.remove('hidden');
-    } catch (err) {
-        const friendly = formatUserError(err.message);
-        document.getElementById('aiExplanation').innerText = friendly;
-        document.getElementById('aiExtractedData').classList.add('hidden');
-        document.getElementById('btnAiApply').classList.add('hidden');
-        document.getElementById('aiResultArea').classList.remove('hidden');
-        showToast(friendly, 'error');
-    } finally {
-        document.getElementById('aiLoading').classList.add('hidden');
-        document.getElementById('btnAiAnalyze').disabled = false;
-    }
-}
-
-function applyAiToCalculator() {
-    if (!lastAiExtractedData) return;
-
-    switchView('shift');
-    const data = lastAiExtractedData;
-
-    if (data.startDate) {
-        window.fpShiftStart.setDate(data.startDate, true);
-    }
-
-    if (data.operation === 'add' || data.operation === 'sub') {
-        document.getElementById('shiftOperation').value = data.operation;
-    }
-
-    document.getElementById('shiftYears').value = data.years || 0;
-    document.getElementById('shiftMonths').value = data.months || 0;
-    document.getElementById('shiftDays').value = data.days || 0;
-    document.getElementById('shiftCountMode').value = 'inclusive';
-
-    setTimeout(function () {
-        showToast('นำข้อมูลจาก AI ใส่ฟอร์มเรียบร้อย', 'info');
-        calculateShift();
-    }, 300);
 }
 
 function exportCSV() {

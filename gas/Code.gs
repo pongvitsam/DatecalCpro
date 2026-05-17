@@ -1,6 +1,5 @@
 /**
  * DateCalc Pro — Google Apps Script API + Spreadsheet database
- * Secrets: Script Properties GEMINI_API_KEY (never expose to frontend)
  */
 
 var HISTORY_SHEET = 'History';
@@ -48,8 +47,6 @@ function handleRequest_(e, method) {
       return jsonResponse_({ success: true, data: deleteHistory_(params) });
     case 'clearHistory':
       return jsonResponse_({ success: true, data: clearHistory_(requireUserId_(params)) });
-    case 'analyzeAI':
-      return jsonResponse_({ success: true, data: analyzeWithGemini_(params) });
     default:
       return jsonResponse_({ success: false, error: 'Unknown action: ' + action });
   }
@@ -97,29 +94,6 @@ function requireUserId_(params) {
     throw new Error('Missing userId');
   }
   return userId;
-}
-
-/**
- * Run once in Apps Script editor: setGeminiApiKeyFromPrompt()
- * Stores key in Script Properties only (never in GitHub / frontend).
- */
-function setGeminiApiKeyFromPrompt() {
-  var ui = SpreadsheetApp.getUi();
-  var result = ui.prompt(
-    'Gemini API Key',
-    'วาง API Key (จะเก็บใน Script Properties เท่านั้น):',
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (result.getSelectedButton() !== ui.Button.OK) {
-    return;
-  }
-  var key = String(result.getResponseText() || '').trim();
-  if (!key) {
-    ui.alert('ไม่มีค่า API Key');
-    return;
-  }
-  PropertiesService.getScriptProperties().setProperty('GEMINI_API_KEY', key);
-  ui.alert('บันทึก GEMINI_API_KEY เรียบร้อย');
 }
 
 function ensureDatabase_() {
@@ -251,134 +225,4 @@ function clearHistory_(userId) {
   }
 
   return { cleared: true, removed: removed };
-}
-
-function getGeminiApiKey_() {
-  var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  if (!key) {
-    throw new Error(
-      'GEMINI_API_KEY not configured. Set it in Script Properties (Project Settings).'
-    );
-  }
-  return key;
-}
-
-function geminiErrorMessage_(code, body) {
-  if (code === 429) {
-    return (
-      'โควต้า Gemini API เต็ม (429) — รอสักครู่แล้วลองใหม่ หรือตรวจสอบแผน/บิลลิ่งที่ ' +
-      'https://ai.google.dev/gemini-api/docs/rate-limits'
-    );
-  }
-  if (code === 403) {
-    return 'API Key ไม่ถูกต้องหรือไม่มีสิทธิ์ใช้ Gemini (403)';
-  }
-  if (code === 400) {
-    return 'คำขอไม่ถูกต้อง (400) — ลองย่อข้อความสัญญา';
-  }
-  try {
-    var errJson = JSON.parse(body);
-    if (errJson.error && errJson.error.message) {
-      return 'Gemini: ' + errJson.error.message;
-    }
-  } catch (ignore) {}
-  return 'Gemini API error (' + code + ')';
-}
-
-function analyzeWithGemini_(params) {
-  var textInput = String((params && params.text) || '').trim();
-  if (!textInput) {
-    throw new Error('Missing text');
-  }
-
-  var apiKey = getGeminiApiKey_();
-  var models = ['gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-2.0-flash'];
-  var currentDate = Utilities.formatDate(new Date(), 'Asia/Bangkok', 'yyyy-MM-dd');
-
-  var payload = {
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text:
-              'ข้อมูลบริบท: วันที่ปัจจุบันคือ ' +
-              currentDate +
-              '\n\nข้อความสัญญา: "' +
-              textInput +
-              '"\n\nจงดึงข้อมูลวันที่เริ่มต้น และระยะเวลาที่ต้องคำนวณออกมา'
-          }
-        ]
-      }
-    ],
-    systemInstruction: {
-      parts: [
-        {
-          text:
-            "คุณคือผู้ช่วยทางกฎหมายภาษาไทยที่เชี่ยวชาญการวิเคราะห์สัญญา หน้าที่ของคุณคือสกัด 'วันที่เริ่มต้น' และ 'ระยะเวลา' ออกจากข้อความ หากผู้ใช้ระบุคำว่า 'วันนี้' หรือ 'พรุ่งนี้' ให้ใช้วันที่ปัจจุบันที่แนบไปให้เพื่ออ้างอิง ถ้าสกัดข้อมูลได้ให้ hasDateInfo เป็น true ถ้าข้อความไม่มีข้อมูลเกี่ยวกับเวลาเลยให้เป็น false อธิบายผลการวิเคราะห์สั้นๆ ใน property 'explanation'"
-        }
-      ]
-    },
-    generationConfig: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'OBJECT',
-        properties: {
-          hasDateInfo: { type: 'BOOLEAN' },
-          startDate: { type: 'STRING' },
-          operation: { type: 'STRING' },
-          years: { type: 'INTEGER' },
-          months: { type: 'INTEGER' },
-          days: { type: 'INTEGER' },
-          explanation: { type: 'STRING' }
-        },
-        required: ['hasDateInfo', 'explanation']
-      }
-    }
-  };
-
-  var options = {
-    method: 'post',
-    contentType: 'application/json',
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  var lastError = 'Gemini API ไม่ตอบสนอง';
-  var m;
-
-  for (m = 0; m < models.length; m++) {
-    var apiUrl =
-      'https://generativelanguage.googleapis.com/v1beta/models/' +
-      models[m] +
-      ':generateContent?key=' +
-      encodeURIComponent(apiKey);
-
-    var response = UrlFetchApp.fetch(apiUrl, options);
-    var code = response.getResponseCode();
-    var body = response.getContentText();
-
-    if (code >= 200 && code < 300) {
-      var parsed = JSON.parse(body);
-      if (
-        parsed.candidates &&
-        parsed.candidates[0] &&
-        parsed.candidates[0].content &&
-        parsed.candidates[0].content.parts &&
-        parsed.candidates[0].content.parts[0]
-      ) {
-        return JSON.parse(parsed.candidates[0].content.parts[0].text);
-      }
-      lastError = 'Invalid Gemini response structure';
-      continue;
-    }
-
-    lastError = geminiErrorMessage_(code, body);
-
-    if (code !== 429) {
-      throw new Error(lastError);
-    }
-  }
-
-  throw new Error(lastError);
 }

@@ -54,7 +54,6 @@
             </div>
             <nav class="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
                 <button type="button" onclick="switchView('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="dashboard"><i class="ph ph-squares-four text-xl text-rose-500"></i> แดชบอร์ด</button>
-                <button type="button" onclick="switchView('ai')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="ai"><i class="ph ph-sparkle text-xl text-purple-500"></i> AI วิเคราะห์สัญญา</button>
                 <button type="button" onclick="switchView('shift')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="shift"><i class="ph ph-calendar-plus text-xl text-rose-500"></i> หาอดีต / อนาคต</button>
                 <button type="button" onclick="switchView('duration')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="duration"><i class="ph ph-arrows-left-right text-xl text-rose-500"></i> หาระยะห่าง</button>
                 <button type="button" onclick="switchView('history')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="history"><i class="ph ph-clock-counter-clockwise text-xl text-rose-500"></i> ประวัติการคำนวณ</button>
@@ -87,7 +86,6 @@
                 </div>
                 <nav class="p-4 space-y-2 flex-1">
                     <button type="button" onclick="switchView('dashboard'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-squares-four text-2xl text-rose-500"></i> แดชบอร์ด</button>
-                    <button type="button" onclick="switchView('ai'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-purple-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-sparkle text-2xl text-purple-500"></i> AI วิเคราะห์สัญญา</button>
                     <button type="button" onclick="switchView('shift'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-calendar-plus text-2xl text-rose-500"></i> หาอดีต / อนาคต</button>
                     <button type="button" onclick="switchView('duration'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-arrows-left-right text-2xl text-rose-500"></i> หาระยะห่าง</button>
                     <button type="button" onclick="switchView('history'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-clock-counter-clockwise text-2xl text-rose-500"></i> ประวัติ</button>
@@ -130,29 +128,6 @@
                 </div>
 
                 
-                <div id="view-ai" class="view-section hidden space-y-6 animate-fade-in">
-                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-sparkle text-purple-500"></i> ผู้ช่วย AI วิเคราะห์สัญญา <span class="text-xs bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-300 px-2 py-1 rounded-full font-medium ml-2">Gemini</span></h2>
-                    <div class="glass p-6 md:p-8 rounded-3xl space-y-6">
-                        <div class="space-y-2">
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">วางข้อความสัญญาหรือเงื่อนไขเวลาที่นี่</label>
-                            <textarea id="aiInputText" rows="4" class="glass-input w-full px-4 py-3 rounded-xl resize-none" placeholder="วางข้อความที่ระบุวันที่ และระยะเวลา..."></textarea>
-                        </div>
-                        <button type="button" id="btnAiAnalyze" onclick="analyzeTextWithAI()" class="w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white"><i class="ph ph-magic-wand"></i> ให้ AI ช่วยวิเคราะห์</button>
-                        <div id="aiLoading" class="hidden flex flex-col items-center py-8"><i class="ph ph-spinner-gap text-4xl text-purple-500 animate-spin"></i><p class="text-sm text-gray-500 mt-4">AI กำลังวิเคราะห์...</p></div>
-                        <div id="aiResultArea" class="hidden mt-6 p-6 rounded-2xl bg-purple-50 dark:bg-slate-800 border border-purple-100 dark:border-purple-900/30">
-                            <h4 class="font-bold mb-2">ผลการวิเคราะห์</h4>
-                            <p id="aiExplanation" class="text-sm text-gray-600 dark:text-gray-300 mb-4"></p>
-                            <div id="aiExtractedData" class="grid grid-cols-2 sm:grid-cols-4 gap-3 hidden">
-                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">เริ่มต้น</p><p id="aiResStartDate" class="font-semibold text-sm mt-1">-</p></div>
-                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">ปี</p><p id="aiResYears" class="font-bold text-lg text-purple-600">0</p></div>
-                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">เดือน</p><p id="aiResMonths" class="font-bold text-lg text-purple-600">0</p></div>
-                                <div class="bg-white/60 dark:bg-slate-900/60 p-3 rounded-xl text-center"><p class="text-xs text-gray-500">วัน</p><p id="aiResDays" class="font-bold text-lg text-purple-600">0</p></div>
-                            </div>
-                            <div class="pt-4 flex justify-end"><button type="button" id="btnAiApply" onclick="applyAiToCalculator()" class="px-5 py-2.5 bg-purple-600 text-white text-sm rounded-xl hidden"><i class="ph ph-share-fat"></i> นำไปคำนวณทันที</button></div>
-                        </div>
-                    </div>
-                </div>
-
                 <div id="view-shift" class="view-section hidden space-y-6 animate-fade-in">
                     <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-calendar-plus text-rose-500"></i> หาอดีต / อนาคต</h2>
                     <div class="glass p-6 md:p-8 rounded-3xl">

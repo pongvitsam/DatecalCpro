@@ -104,9 +104,6 @@ const DateCalcApi = (function () {
     },
     clearHistory: function () {
       return request('clearHistory', {}, 'POST');
-    },
-    analyzeAI: function (text) {
-      return request('analyzeAI', { text: text }, 'POST');
     }
   };
 })();

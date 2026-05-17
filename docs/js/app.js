@@ -220,10 +220,15 @@ function calculateShift() {
     };
 }
 
-function calcTotalDaysBetween(startDate, endDate, countMode) {
-    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
-    let total = Math.round((end.getTime() - start.getTime()) / 86400000);
+/** แปลง ปี+เดือน+วัน จากวันเริ่มต้น เป็นจำนวนวันรวม (ปฏิทินจริง) */
+function totalDaysFromBreakdown(startDate, years, months, days, countMode) {
+    const from = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const to = new Date(from);
+    to.setFullYear(to.getFullYear() + years);
+    to.setMonth(to.getMonth() + months);
+    to.setDate(to.getDate() + days);
+
+    let total = Math.round((to.getTime() - from.getTime()) / 86400000);
     if (countMode === 'inclusive') {
         total += 1;
     }
@@ -241,39 +246,64 @@ function formatDurationResultText(years, months, days, totalDays, displayFormat)
     return years + ' ปี ' + months + ' เดือน ' + days + ' วัน';
 }
 
+function setResultBlockVisible(el, visible) {
+    if (!el) return;
+    if (visible) {
+        el.classList.remove('hidden');
+        el.style.display = '';
+    } else {
+        el.classList.add('hidden');
+        el.style.display = 'none';
+    }
+}
+
 function renderDurationDisplay(years, months, days, totalDays, displayFormat) {
     const blockYear = document.getElementById('resBlockYear');
     const blockMonth = document.getElementById('resBlockMonth');
     const blockDay = document.getElementById('resBlockDay');
+    const resDay = document.getElementById('resDay');
     const dayLabel = document.getElementById('resDayLabel');
 
-    if (!blockYear || !blockMonth || !blockDay) {
+    if (!blockYear || !blockMonth || !blockDay || !resDay) {
         return;
     }
 
-    blockYear.classList.add('hidden');
-    blockMonth.classList.add('hidden');
-    blockDay.classList.remove('hidden');
+    const resultTitle = document.getElementById('durResultTitle');
 
     if (displayFormat === 'days') {
-        document.getElementById('resDay').innerText = totalDays;
-        if (dayLabel) dayLabel.innerText = 'วัน';
+        setResultBlockVisible(blockYear, false);
+        setResultBlockVisible(blockMonth, false);
+        setResultBlockVisible(blockDay, true);
+        resDay.innerText = totalDays;
+        resDay.className = 'text-5xl md:text-6xl font-bold text-rose-600 dark:text-rose-400';
+        if (dayLabel) dayLabel.innerText = 'วันรวม';
+        if (resultTitle) {
+            resultTitle.innerText =
+                'รวม ' + years + ' ปี ' + months + ' เดือน ' + days + ' วัน = ' + totalDays + ' วัน';
+        }
         return;
     }
+
+    if (resultTitle) resultTitle.innerText = 'ระยะเวลาทั้งหมด';
+
+    resDay.className = 'text-4xl font-bold text-rose-600 dark:text-rose-400';
 
     if (displayFormat === 'months') {
-        blockMonth.classList.remove('hidden');
+        setResultBlockVisible(blockYear, false);
+        setResultBlockVisible(blockMonth, true);
+        setResultBlockVisible(blockDay, true);
         document.getElementById('resMonth').innerText = years * 12 + months;
-        document.getElementById('resDay').innerText = days;
+        resDay.innerText = days;
         if (dayLabel) dayLabel.innerText = 'วัน';
         return;
     }
 
-    blockYear.classList.remove('hidden');
-    blockMonth.classList.remove('hidden');
+    setResultBlockVisible(blockYear, true);
+    setResultBlockVisible(blockMonth, true);
+    setResultBlockVisible(blockDay, true);
     document.getElementById('resYear').innerText = years;
     document.getElementById('resMonth').innerText = months;
-    document.getElementById('resDay').innerText = days;
+    resDay.innerText = days;
     if (dayLabel) dayLabel.innerText = 'วัน';
 }
 
@@ -319,7 +349,7 @@ function calculateDuration() {
     }
 
     const displayFormat = document.getElementById('durDisplayFormat').value;
-    const totalDays = calcTotalDaysBetween(originalD1, originalD2, countMode);
+    const totalDays = totalDaysFromBreakdown(originalD1, years, months, days, countMode);
 
     renderDurationDisplay(years, months, days, totalDays, displayFormat);
     document.getElementById('durResultArea').classList.remove('hidden');
@@ -328,7 +358,14 @@ function calculateDuration() {
     const formatLabels = { full: 'วันเดือนปี', months: 'วันและเดือน', days: 'วันอย่างเดียว' };
     const formatLabel = formatLabels[displayFormat] || displayFormat;
 
-    window._lastDurationParts = { years: years, months: months, days: days, totalDays: totalDays };
+    window._lastDurationParts = {
+        years: years,
+        months: months,
+        days: days,
+        totalDays: totalDays,
+        startTime: originalD1.getTime(),
+        countMode: countMode
+    };
 
     currentTempResult = {
         type: 'duration',
@@ -556,11 +593,20 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!parts || !area || area.classList.contains('hidden')) {
                 return;
             }
+            const totalDays = totalDaysFromBreakdown(
+                new Date(parts.startTime),
+                parts.years,
+                parts.months,
+                parts.days,
+                parts.countMode
+            );
+            parts.totalDays = totalDays;
+
             renderDurationDisplay(
                 parts.years,
                 parts.months,
                 parts.days,
-                parts.totalDays,
+                totalDays,
                 durDisplayFormat.value
             );
             if (currentTempResult && currentTempResult.type === 'duration') {
@@ -569,7 +615,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     parts.years,
                     parts.months,
                     parts.days,
-                    parts.totalDays,
+                    totalDays,
                     durDisplayFormat.value
                 );
                 currentTempResult.label =

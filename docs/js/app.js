@@ -130,14 +130,105 @@ function totalDaysBetween(startDate, endDate, countMode) {
     return total < 0 ? 0 : total;
 }
 
-/** บวก/ลบ ปี เดือน วัน จากวันที่ตั้งต้น (เที่ยงคืน) */
-function addYmdToDate(baseDate, years, months, days, factor) {
+function daysInMonth(year, month) {
+    return new Date(year, month + 1, 0).getDate();
+}
+
+/** บวก/ลบ ปี-เดือน-วัน แบบปฏิทิน — สอดคล้องกับ computeYmdDiff (ไม่ใช้ setMonth ของ JS) */
+function subtractCalendarYmd(endCalcDate, years, months, days, preferNear) {
+    const target = startOfDay(endCalcDate).getTime();
+    const approxMs =
+        target - Math.round((years * 365.25 + months * 30 + days) * MS_PER_DAY);
+    const approx = preferNear != null ? startOfDay(preferNear) : startOfDay(new Date(approxMs));
+
+    let best = null;
+    let bestDist = Infinity;
+    const windowDays = 120;
+
+    for (let delta = -windowDays; delta <= windowDays; delta++) {
+        const tryDate = startOfDay(new Date(approx.getTime() + delta * MS_PER_DAY));
+        if (addCalendarYmd(tryDate, years, months, days, 1).getTime() === target) {
+            const dist = Math.abs(tryDate.getTime() - approx.getTime());
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = tryDate;
+            }
+        }
+    }
+
+    if (best != null) {
+        return best;
+    }
+
+    const guess = startOfDay(endCalcDate);
+    guess.setFullYear(guess.getFullYear() - years - 1);
+    guess.setMonth(guess.getMonth() - months - 1);
+    guess.setDate(guess.getDate() - days - 14);
+    let lo = Math.max(new Date(1900, 0, 1).getTime(), guess.getTime());
+    let hi = target;
+    let answer = null;
+
+    while (lo <= hi) {
+        const mid = lo + Math.floor((hi - lo) / (2 * MS_PER_DAY)) * MS_PER_DAY;
+        const forward = addCalendarYmd(startOfDay(new Date(mid)), years, months, days, 1).getTime();
+        if (forward === target) {
+            answer = mid;
+            hi = mid - MS_PER_DAY;
+        } else if (forward < target) {
+            lo = mid + MS_PER_DAY;
+        } else {
+            hi = mid - MS_PER_DAY;
+        }
+    }
+
+    if (answer != null) {
+        return startOfDay(new Date(answer));
+    }
+    return startOfDay(new Date(lo));
+}
+
+function addCalendarYmd(baseDate, years, months, days, factor) {
     const f = factor || 1;
-    const result = startOfDay(baseDate);
-    result.setFullYear(result.getFullYear() + years * f);
-    result.setMonth(result.getMonth() + months * f);
-    result.setDate(result.getDate() + days * f);
-    return result;
+    if (f < 0) {
+        return subtractCalendarYmd(baseDate, years, months, days);
+    }
+
+    const base = startOfDay(baseDate);
+    let y = base.getFullYear() + years;
+    let m = base.getMonth() + months;
+    let day = base.getDate() + days;
+
+    while (m < 0) {
+        m += 12;
+        y -= 1;
+    }
+    while (m > 11) {
+        m -= 12;
+        y += 1;
+    }
+
+    while (day > daysInMonth(y, m)) {
+        day -= daysInMonth(y, m);
+        m += 1;
+        if (m > 11) {
+            m = 0;
+            y += 1;
+        }
+    }
+    while (day < 1) {
+        m -= 1;
+        if (m < 0) {
+            m = 11;
+            y -= 1;
+        }
+        day += daysInMonth(y, m);
+    }
+
+    return startOfDay(new Date(y, m, day));
+}
+
+function addYmdToDate(baseDate, years, months, days, factor) {
+    return addCalendarYmd(baseDate, years, months, days, factor);
 }
 
 /** แยกระยะห่างเป็น ปี เดือน วัน */
@@ -246,13 +337,21 @@ function calculateShift() {
     const isAdd = op === 'add';
     const factor = isAdd ? 1 : -1;
 
-    let resultDate = addYmdToDate(startDate, years, months, days, factor);
-
-    if (countMode === 'inclusive') {
-        resultDate.setDate(resultDate.getDate() + (isAdd ? -1 : 1));
+    let resultDate;
+    if (isAdd) {
+        resultDate = addCalendarYmd(startDate, years, months, days, 1);
+        if (countMode === 'inclusive') {
+            resultDate.setDate(resultDate.getDate() - 1);
+        }
+        resultDate = startOfDay(resultDate);
+    } else {
+        let endCalc = startDate;
+        if (countMode === 'inclusive') {
+            endCalc = startOfDay(startDate);
+            endCalc.setDate(endCalc.getDate() + 1);
+        }
+        resultDate = subtractCalendarYmd(endCalc, years, months, days, startDate);
     }
-
-    resultDate = startOfDay(resultDate);
 
     const thaiFormatEnd = formatThaiDate(resultDate);
     const thaiFormatStart = formatThaiDate(startDate);
@@ -291,15 +390,17 @@ function calculateShift() {
     };
 }
 
-/** แปลง ปี+เดือน+วัน เป็นจำนวนวันรวม (midnight + Math.round) */
-function totalDaysFromBreakdown(startDate, years, months, days, countMode) {
-    const from = startOfDay(startDate);
-    const to = addYmdToDate(from, years, months, days, 1);
-    let total = diffCalendarDays(from, to);
-    if (countMode === 'inclusive') {
-        total += 1;
+/** แปลง ปี+เดือน+วัน เป็นจำนวนวันรวม — ใช้ปฏิทินจริงเมื่อมีวันสิ้นสุด */
+function totalDaysFromBreakdown(startDate, years, months, days, countMode, endDate) {
+    if (endDate != null) {
+        return totalDaysBetween(startDate, endDate, countMode);
     }
-    return total < 0 ? 0 : total;
+    const from = startOfDay(startDate);
+    let to = addCalendarYmd(from, years, months, days, 1);
+    if (countMode === 'inclusive') {
+        to.setDate(to.getDate() - 1);
+    }
+    return totalDaysBetween(from, to, countMode);
 }
 
 function formatDurationResultText(years, months, days, totalDays, displayFormat) {
@@ -396,18 +497,21 @@ function calculateDuration() {
     const countMode = document.getElementById('durCountMode').value;
     const originalD1 = startOfDay(sd[0]);
     const originalD2 = startOfDay(ed[0]);
+    let rangeStart = originalD1;
+    let rangeEnd = originalD2;
+    if (rangeStart > rangeEnd) {
+        rangeStart = originalD2;
+        rangeEnd = originalD1;
+    }
 
-    const ymd = computeYmdDiff(originalD1, originalD2, countMode);
+    const ymd = computeYmdDiff(rangeStart, rangeEnd, countMode);
     const years = ymd.years;
     const months = ymd.months;
     const days = ymd.days;
 
     const displayFormat = document.getElementById('durDisplayFormat').value;
-    const totalDaysCalendar = totalDaysBetween(originalD1, originalD2, countMode);
-    const totalDays =
-        displayFormat === 'days'
-            ? totalDaysCalendar
-            : totalDaysFromBreakdown(originalD1, years, months, days, countMode);
+    const totalDaysCalendar = totalDaysBetween(rangeStart, rangeEnd, countMode);
+    const totalDays = totalDaysFromBreakdown(rangeStart, years, months, days, countMode, rangeEnd);
 
     renderDurationDisplay(years, months, days, totalDays, displayFormat, {
         totalDaysCalendar: totalDaysCalendar
@@ -426,6 +530,8 @@ function calculateDuration() {
         totalDaysCalendar: totalDaysCalendar,
         startTime: originalD1.getTime(),
         endTime: originalD2.getTime(),
+        rangeStartTime: rangeStart.getTime(),
+        rangeEndTime: rangeEnd.getTime(),
         countMode: countMode
     };
 
@@ -655,13 +761,17 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!parts || !area || area.classList.contains('hidden')) {
                 return;
             }
-            const start = startOfDay(new Date(parts.startTime));
-            const end = startOfDay(new Date(parts.endTime));
-            const totalDaysCalendar = totalDaysBetween(start, end, parts.countMode);
-            const totalDays =
-                durDisplayFormat.value === 'days'
-                    ? totalDaysCalendar
-                    : totalDaysFromBreakdown(start, parts.years, parts.months, parts.days, parts.countMode);
+            const rangeStart = startOfDay(new Date(parts.rangeStartTime != null ? parts.rangeStartTime : parts.startTime));
+            const rangeEnd = startOfDay(new Date(parts.rangeEndTime != null ? parts.rangeEndTime : parts.endTime));
+            const totalDaysCalendar = totalDaysBetween(rangeStart, rangeEnd, parts.countMode);
+            const totalDays = totalDaysFromBreakdown(
+                rangeStart,
+                parts.years,
+                parts.months,
+                parts.days,
+                parts.countMode,
+                rangeEnd
+            );
             parts.totalDays = totalDays;
             parts.totalDaysCalendar = totalDaysCalendar;
 

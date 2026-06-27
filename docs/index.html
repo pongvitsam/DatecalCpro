@@ -56,6 +56,7 @@
                 <button type="button" onclick="switchView('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="dashboard"><i class="ph ph-squares-four text-xl text-rose-500"></i> แดชบอร์ด</button>
                 <button type="button" onclick="switchView('shift')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="shift"><i class="ph ph-calendar-plus text-xl text-rose-500"></i> หาอดีต / อนาคต</button>
                 <button type="button" onclick="switchView('duration')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="duration"><i class="ph ph-arrows-left-right text-xl text-rose-500"></i> หาระยะห่าง</button>
+                <button type="button" onclick="switchView('age')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="age"><i class="ph ph-cake text-xl text-rose-500"></i> คำนวณอายุ</button>
                 <button type="button" onclick="switchView('history')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="history"><i class="ph ph-clock-counter-clockwise text-xl text-rose-500"></i> ประวัติการคำนวณ</button>
                 <button type="button" onclick="switchView('export')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-rose-50 dark:hover:bg-slate-700/50 transition-colors text-left font-medium" data-target="export"><i class="ph ph-export text-xl text-rose-500"></i> ส่งออกข้อมูล (CSV)</button>
             </nav>
@@ -88,6 +89,7 @@
                     <button type="button" onclick="switchView('dashboard'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-squares-four text-2xl text-rose-500"></i> แดชบอร์ด</button>
                     <button type="button" onclick="switchView('shift'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-calendar-plus text-2xl text-rose-500"></i> หาอดีต / อนาคต</button>
                     <button type="button" onclick="switchView('duration'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-arrows-left-right text-2xl text-rose-500"></i> หาระยะห่าง</button>
+                    <button type="button" onclick="switchView('age'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-cake text-2xl text-rose-500"></i> คำนวณอายุ</button>
                     <button type="button" onclick="switchView('history'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-clock-counter-clockwise text-2xl text-rose-500"></i> ประวัติ</button>
                     <button type="button" onclick="switchView('export'); toggleMobileMenu()" class="w-full flex items-center gap-3 p-4 rounded-2xl hover:bg-rose-50 dark:hover:bg-slate-800 text-left font-medium"><i class="ph ph-export text-2xl text-rose-500"></i> ส่งออกข้อมูล</button>
                 </nav>
@@ -191,6 +193,38 @@
                                 <div id="resBlockDay" class="text-center"><span id="resDay" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span id="resDayLabel" class="block text-sm text-gray-500">วัน</span></div>
                             </div>
                             <div class="mt-6 flex justify-center"><button type="button" onclick="saveResult('duration')" class="px-4 py-2 bg-white dark:bg-slate-800 text-sm rounded-lg border flex items-center gap-2"><i class="ph ph-floppy-disk text-rose-500"></i> บันทึกผลลัพธ์</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-age" class="view-section hidden space-y-6 animate-fade-in">
+                    <h2 class="text-2xl font-bold flex items-center gap-2"><i class="ph ph-cake text-rose-500"></i> คำนวณอายุ</h2>
+                    <div class="glass p-6 md:p-8 rounded-3xl">
+                        <form id="formAge" onsubmit="event.preventDefault(); calculateAge();" class="space-y-6">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-medium">วันเกิด <span class="text-rose-500">*</span></label>
+                                    <input type="text" id="ageBirthDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer" placeholder="เลือกวันเกิด...">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-medium">ณ วันที่</label>
+                                    <input type="text" id="ageAsOfDate" required class="glass-input w-full px-4 py-3 rounded-xl cursor-pointer" placeholder="เลือกวันที่...">
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button type="button" onclick="setAgeAsOfToday()" class="text-xs px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/40 text-rose-600">ใช้วันนี้</button>
+                            </div>
+                            <button type="submit" class="glass-button w-full py-3 rounded-xl font-medium text-lg flex items-center justify-center gap-2"><i class="ph ph-calculator"></i> คำนวณอายุ</button>
+                        </form>
+                        <div id="ageResultArea" class="hidden mt-8 p-6 rounded-2xl bg-gradient-to-r from-rose-50 to-purple-50 dark:from-slate-800 dark:to-slate-700 border text-center">
+                            <p id="ageResultTitle" class="text-sm text-gray-500 mb-2">อายุ</p>
+                            <div class="flex flex-wrap justify-center gap-8">
+                                <div class="text-center"><span id="ageResYear" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span class="block text-sm text-gray-500">ปี</span></div>
+                                <div class="text-center"><span id="ageResMonth" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span class="block text-sm text-gray-500">เดือน</span></div>
+                                <div class="text-center"><span id="ageResDay" class="text-4xl font-bold text-rose-600 dark:text-rose-400">0</span><span class="block text-sm text-gray-500">วัน</span></div>
+                            </div>
+                            <p id="ageResultSummary" class="text-sm text-gray-600 dark:text-gray-300 mt-4"></p>
+                            <div class="mt-6 flex justify-center"><button type="button" onclick="saveResult('age')" class="px-4 py-2 bg-white dark:bg-slate-800 text-sm rounded-lg border flex items-center gap-2"><i class="ph ph-floppy-disk text-rose-500"></i> บันทึกผลลัพธ์</button></div>
                         </div>
                     </div>
                 </div>

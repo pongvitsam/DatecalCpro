@@ -444,6 +444,14 @@ function initDatePickers() {
     window.fpShiftStart = flatpickr('#shiftStartDate', Object.assign({}, fpConfig, { defaultDate: new Date() }));
     window.fpDurStart = flatpickr('#durStartDate', Object.assign({}, fpConfig, { defaultDate: new Date() }));
     window.fpDurEnd = flatpickr('#durEndDate', Object.assign({}, fpConfig, { defaultDate: new Date() }));
+    window.fpAgeBirth = flatpickr('#ageBirthDate', Object.assign({}, fpConfig));
+    window.fpAgeAsOf = flatpickr('#ageAsOfDate', Object.assign({}, fpConfig, { defaultDate: new Date() }));
+}
+
+function setAgeAsOfToday() {
+    if (window.fpAgeAsOf) {
+        window.fpAgeAsOf.setDate(new Date(), true);
+    }
 }
 
 function updateLiveClock() {
@@ -688,6 +696,56 @@ function calculateDuration() {
     };
 }
 
+function calculateAge() {
+    const birthDates = window.fpAgeBirth.selectedDates;
+    const asOfDates = window.fpAgeAsOf.selectedDates;
+
+    if (!birthDates || birthDates.length === 0) {
+        showToast('กรุณาเลือกวันเกิด', 'error');
+        return;
+    }
+    if (!asOfDates || asOfDates.length === 0) {
+        showToast('กรุณาเลือกวันที่อ้างอิง', 'error');
+        return;
+    }
+
+    const birthDate = startOfDay(birthDates[0]);
+    const asOfDate = startOfDay(asOfDates[0]);
+
+    if (birthDate > asOfDate) {
+        showToast('วันเกิดต้องไม่เกินวันที่อ้างอิง', 'error');
+        return;
+    }
+
+    const ymd = computeYmdDiff(birthDate, asOfDate, 'exclusive');
+    const years = ymd.years;
+    const months = ymd.months;
+    const days = ymd.days;
+    const totalDays = totalDaysBetween(birthDate, asOfDate, 'exclusive');
+
+    document.getElementById('ageResYear').innerText = years;
+    document.getElementById('ageResMonth').innerText = months;
+    document.getElementById('ageResDay').innerText = days;
+    document.getElementById('ageResultTitle').innerText = 'อายุ ณ วันที่ ' + formatThaiDate(asOfDate);
+    document.getElementById('ageResultSummary').innerText =
+        'เกิดวันที่ ' +
+        formatThaiDate(birthDate) +
+        ' · รวม ' +
+        totalDays +
+        ' วัน';
+
+    document.getElementById('ageResultArea').classList.remove('hidden');
+
+    const resultText = years + ' ปี ' + months + ' เดือน ' + days + ' วัน';
+    currentTempResult = {
+        type: 'age',
+        label: 'คำนวณอายุ',
+        detail: 'เกิด ' + formatThaiDate(birthDate) + ' · ณ ' + formatThaiDate(asOfDate),
+        result: resultText,
+        timestamp: new Date().toISOString()
+    };
+}
+
 async function saveResult(type) {
     if (!currentTempResult) return;
     if (!apiReady) {
@@ -703,6 +761,7 @@ async function saveResult(type) {
 
         if (type === 'shift') document.getElementById('shiftResultArea').classList.add('hidden');
         if (type === 'duration') document.getElementById('durResultArea').classList.add('hidden');
+        if (type === 'age') document.getElementById('ageResultArea').classList.add('hidden');
 
         await loadHistory();
         updateDashboard();
@@ -782,8 +841,15 @@ function renderHistory() {
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50 dark:hover:bg-slate-700/30 transition';
 
-        const typeIcon = item.type === 'shift' ? 'calendar-plus' : 'arrows-left-right';
-        const typeColor = item.type === 'shift' ? 'text-blue-500' : 'text-emerald-500';
+        let typeIcon = 'arrows-left-right';
+        let typeColor = 'text-emerald-500';
+        if (item.type === 'shift') {
+            typeIcon = 'calendar-plus';
+            typeColor = 'text-blue-500';
+        } else if (item.type === 'age') {
+            typeIcon = 'cake';
+            typeColor = 'text-amber-500';
+        }
         const dateObj = new Date(item.timestamp);
         const timeStr = dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 

@@ -138,7 +138,7 @@ function rowToItem_(row) {
   return {
     id: String(row[0] || ''),
     userId: String(row[1] || ''),
-    type: String(row[2] || ''),
+    type: String(row[2] || 'shift'),
     label: String(row[3] || ''),
     detail: String(row[4] || ''),
     result: String(row[5] || ''),
@@ -208,7 +208,7 @@ function deleteHistory_(params) {
     }
   }
 
-  return { deleted: false, id: id };
+  throw new Error('Item not found');
 }
 
 function clearHistory_(userId) {

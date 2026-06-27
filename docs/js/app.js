@@ -496,6 +496,9 @@ function setQuickShift(d, m, y) {
     document.getElementById('shiftDays').value = d;
     document.getElementById('shiftMonths').value = m;
     document.getElementById('shiftYears').value = y;
+    if (d !== 0 || m !== 0 || y !== 0) {
+        document.getElementById('shiftOperation').value = 'add';
+    }
 }
 
 function calculateShift() {
@@ -529,8 +532,12 @@ function calculateShift() {
 
     const thaiFormatEnd = formatThaiDate(resultDate);
     const thaiFormatStart = formatThaiDate(startDate);
+    const thaiFormatAnchor = thaiFormatStart;
+    const thaiFormatResult = thaiFormatEnd;
 
-    document.getElementById('sumStartDate').innerText = thaiFormatStart;
+    document.getElementById('sumStartLabel').innerText = isAdd ? 'วันที่เริ่มต้น:' : 'วันที่อ้างอิง:';
+    document.getElementById('sumEndLabel').innerText = isAdd ? 'วันที่สิ้นสุด:' : 'วันที่ที่ได้:';
+    document.getElementById('sumStartDate').innerText = thaiFormatAnchor;
 
     const durText = [];
     if (years > 0) durText.push(years + ' ปี');
@@ -543,14 +550,16 @@ function calculateShift() {
             ? 'นับตั้งแต่วันที่เลือก (รวมวันแรกเป็นวันที่ 1)'
             : 'นับถัดจากวันที่เลือก (ไม่รวมวันแรก)';
     document.getElementById('sumCondition').innerText = modeTextDetail;
-    document.getElementById('sumEndDate').innerText = thaiFormatEnd;
+    document.getElementById('sumEndDate').innerText = thaiFormatResult;
 
     const dayOfWeek = resultDate.getDay();
     const warningEl = document.getElementById('weekendWarning');
     if (dayOfWeek === 0 || dayOfWeek === 6) {
         warningEl.classList.remove('hidden');
+        warningEl.classList.add('flex');
     } else {
         warningEl.classList.add('hidden');
+        warningEl.classList.remove('flex');
     }
 
     document.getElementById('shiftResultArea').classList.remove('hidden');
@@ -558,8 +567,8 @@ function calculateShift() {
     currentTempResult = {
         type: 'shift',
         label: 'คำนวณสัญญา (' + (isAdd ? 'บวก' : 'ลบ') + ')',
-        detail: 'เริ่ม: ' + thaiFormatStart + ' | ' + modeTextDetail + ' | ระยะ: ' + durText.join(' '),
-        result: thaiFormatEnd,
+        detail: (isAdd ? 'เริ่ม: ' : 'อ้างอิง: ') + thaiFormatAnchor + ' | ' + modeTextDetail + ' | ระยะ: ' + durText.join(' '),
+        result: thaiFormatResult,
         timestamp: new Date().toISOString()
     };
 }
@@ -777,6 +786,9 @@ async function saveResult(type) {
 
     try {
         const saved = await DateCalcApi.saveHistory(currentTempResult);
+        if (!saved || !saved.id) {
+            throw new Error('บันทึกไม่สำเร็จ — ไม่ได้รับรหัสรายการ');
+        }
         currentTempResult.id = saved.id;
         showToast('บันทึกข้อมูลเรียบร้อยแล้ว');
         currentTempResult = null;
@@ -809,10 +821,16 @@ async function loadHistory() {
 }
 
 async function deleteHistory(id) {
-    if (!apiReady) return;
+    if (!apiReady) {
+        showToast('API ยังไม่พร้อม — ตรวจสอบ config.js', 'error');
+        return;
+    }
 
     try {
-        await DateCalcApi.deleteHistory(id);
+        const result = await DateCalcApi.deleteHistory(id);
+        if (!result || !result.deleted) {
+            throw new Error('ไม่พบรายการที่ต้องการลบ');
+        }
         await loadHistory();
         showToast('ลบรายการเรียบร้อย');
     } catch (err) {
@@ -822,7 +840,10 @@ async function deleteHistory(id) {
 
 async function clearHistory() {
     if (dbHistory.length === 0) return;
-    if (!apiReady) return;
+    if (!apiReady) {
+        showToast('API ยังไม่พร้อม — ตรวจสอบ config.js', 'error');
+        return;
+    }
     if (!window.confirm('ล้างประวัติการคำนวณทั้งหมด? การกระทำนี้ย้อนกลับไม่ได้')) {
         return;
     }
@@ -846,6 +867,27 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
+function formatHistoryTime(timestamp) {
+    const dateObj = new Date(timestamp);
+    if (isNaN(dateObj.getTime())) {
+        return '-';
+    }
+    return dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+}
+
+function getHistoryTypeMeta(type) {
+    if (type === 'shift') {
+        return { icon: 'calendar-plus', color: 'text-blue-500' };
+    }
+    if (type === 'age') {
+        return { icon: 'cake', color: 'text-amber-500' };
+    }
+    if (type === 'duration') {
+        return { icon: 'arrows-left-right', color: 'text-emerald-500' };
+    }
+    return { icon: 'question', color: 'text-gray-400' };
+}
+
 function renderHistory() {
     const tbody = document.getElementById('historyTableBody');
     const emptyState = document.getElementById('emptyHistory');
@@ -860,44 +902,39 @@ function renderHistory() {
     emptyState.classList.add('hidden');
 
     dbHistory.forEach(function (item) {
+        const itemType = item.type || 'shift';
+        const typeMeta = getHistoryTypeMeta(itemType);
+        const timeStr = formatHistoryTime(item.timestamp);
+
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-gray-50 dark:hover:bg-slate-700/30 transition';
-
-        let typeIcon = 'arrows-left-right';
-        let typeColor = 'text-emerald-500';
-        if (item.type === 'shift') {
-            typeIcon = 'calendar-plus';
-            typeColor = 'text-blue-500';
-        } else if (item.type === 'age') {
-            typeIcon = 'cake';
-            typeColor = 'text-amber-500';
-        }
-        const dateObj = new Date(item.timestamp);
-        const timeStr = dateObj.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
 
         tr.innerHTML =
             '<td class="p-4 border-t border-gray-100 dark:border-gray-800">' +
             '<div class="flex items-center gap-2">' +
-            '<i class="ph ph-' + typeIcon + ' ' + typeColor + ' text-xl"></i>' +
+            '<i class="ph ph-' + typeMeta.icon + ' ' + typeMeta.color + ' text-xl"></i>' +
             '<div><p class="font-medium text-sm whitespace-nowrap">' + escapeHtml(item.label) + '</p>' +
-            '<p class="text-xs text-gray-400">' + timeStr + ' น.</p></div></div></td>' +
+            '<p class="text-xs text-gray-400">' + escapeHtml(timeStr) + '</p></div></div></td>' +
             '<td class="p-4 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate">' +
             escapeHtml(item.detail) +
             '</td>' +
             '<td class="p-4 border-t border-gray-100 dark:border-gray-800">' +
             '<span class="inline-flex px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-full text-sm font-semibold whitespace-nowrap">' +
             escapeHtml(item.result) +
-            '</span></td>' +
-            '<td class="p-4 border-t border-gray-100 dark:border-gray-800 text-right">' +
-            '<button type="button" data-delete-id="' +
-            item.id +
-            '" class="p-2 text-gray-400 hover:text-red-500 transition rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">' +
-            '<i class="ph ph-trash text-lg"></i></button></td>';
+            '</span></td>';
 
-        const btn = tr.querySelector('[data-delete-id]');
-        btn.addEventListener('click', function () {
+        const deleteTd = document.createElement('td');
+        deleteTd.className = 'p-4 border-t border-gray-100 dark:border-gray-800 text-right';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className =
+            'p-2 text-gray-400 hover:text-red-500 transition rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20';
+        deleteBtn.innerHTML = '<i class="ph ph-trash text-lg"></i>';
+        deleteBtn.addEventListener('click', function () {
             deleteHistory(item.id);
         });
+        deleteTd.appendChild(deleteBtn);
+        tr.appendChild(deleteTd);
 
         tbody.appendChild(tr);
     });
@@ -914,14 +951,16 @@ function exportCSV() {
     }
 
     let csvContent = '\uFEFF';
-    csvContent += 'รหัส,ประเภท,รายละเอียด,ผลลัพธ์,วันที่บันทึก\n';
+    csvContent += 'รหัส,ประเภท,ชื่อ,รายละเอียด,ผลลัพธ์,วันที่บันทึก\n';
 
     dbHistory.forEach(function (item) {
-        const dateStr = new Date(item.timestamp).toLocaleString('th-TH');
+        const dateObj = new Date(item.timestamp);
+        const dateStr = isNaN(dateObj.getTime()) ? '' : dateObj.toLocaleString('th-TH');
+        const typeCol = '"' + String(item.type || '').replace(/"/g, '""') + '"';
         const label = '"' + String(item.label).replace(/"/g, '""') + '"';
         const detail = '"' + String(item.detail).replace(/"/g, '""') + '"';
         const result = '"' + String(item.result).replace(/"/g, '""') + '"';
-        csvContent += item.id + ',' + label + ',' + detail + ',' + result + ',' + dateStr + '\n';
+        csvContent += item.id + ',' + typeCol + ',' + label + ',' + detail + ',' + result + ',' + dateStr + '\n';
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });

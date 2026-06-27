@@ -347,9 +347,19 @@ function computeYmdDiff(startDate, endDate, countMode) {
 }
 
 var BE_YEAR_OFFSET = 543;
+var BE_YEAR_MIN = 2400;
+var BE_YEAR_MAX = 2700;
+
+function isYearInputFocused(instance) {
+    const el = instance && instance.currentYearElement;
+    return el && document.activeElement === el;
+}
 
 function syncFlatpickrBuddhistYear(instance) {
     if (!instance || !instance.currentYearElement) {
+        return;
+    }
+    if (isYearInputFocused(instance)) {
         return;
     }
     instance.currentYearElement.value = String(instance.currentYear + BE_YEAR_OFFSET);
@@ -359,12 +369,25 @@ function applyBuddhistYearFromInput(instance) {
     if (!instance || !instance.currentYearElement) {
         return;
     }
-    const raw = parseInt(instance.currentYearElement.value, 10);
-    if (isNaN(raw)) {
+    const el = instance.currentYearElement;
+    const digits = el.value.replace(/\D/g, '');
+    const raw = parseInt(digits, 10);
+
+    if (isNaN(raw) || digits.length < 4) {
         syncFlatpickrBuddhistYear(instance);
         return;
     }
-    const ceYear = raw >= 2400 ? raw - BE_YEAR_OFFSET : raw;
+
+    let ceYear;
+    if (raw >= BE_YEAR_MIN && raw <= BE_YEAR_MAX) {
+        ceYear = raw - BE_YEAR_OFFSET;
+    } else if (raw >= 1900 && raw <= 2100) {
+        ceYear = raw;
+    } else {
+        syncFlatpickrBuddhistYear(instance);
+        return;
+    }
+
     if (ceYear !== instance.currentYear) {
         instance.changeYear(ceYear);
     }
@@ -378,23 +401,18 @@ function attachFlatpickrBuddhistYearInput(instance) {
         return;
     }
     el._buddhistYearBound = true;
-    el.setAttribute('min', '2400');
-    el.setAttribute('max', '2700');
+    el.type = 'text';
+    el.inputMode = 'numeric';
+    el.setAttribute('maxlength', '4');
     el.setAttribute('aria-label', 'ปี พ.ศ.');
     el.addEventListener('blur', function () {
         applyBuddhistYearFromInput(instance);
     });
-    el.addEventListener('change', function () {
-        applyBuddhistYearFromInput(instance);
-    });
     el.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
+            e.preventDefault();
             applyBuddhistYearFromInput(instance);
-        }
-    });
-    el.addEventListener('input', function () {
-        if (el.value.length >= 4) {
-            applyBuddhistYearFromInput(instance);
+            el.blur();
         }
     });
     var yearWrap = el.parentElement;
@@ -411,9 +429,13 @@ function attachFlatpickrBuddhistYearInput(instance) {
 
 function onFlatpickrBuddhistYearHook(selectedDates, dateStr, instance) {
     attachFlatpickrBuddhistYearInput(instance);
-    syncFlatpickrBuddhistYear(instance);
-    setTimeout(function () {
+    if (!isYearInputFocused(instance)) {
         syncFlatpickrBuddhistYear(instance);
+    }
+    setTimeout(function () {
+        if (!isYearInputFocused(instance)) {
+            syncFlatpickrBuddhistYear(instance);
+        }
     }, 0);
 }
 
